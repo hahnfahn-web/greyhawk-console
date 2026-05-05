@@ -1,20 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 
+const BRIDGE_DEFAULT =
+  "https://rolls-realms-discord-bridge-production.up.railway.app/api";
+
 const CONDITIONS = [
-  "Blessed",
-  "Raging",
-  "Prone",
-  "Poisoned",
-  "Frightened",
-  "Restrained",
-  "Stunned",
-  "Invisible",
-  "Concentrating",
-  "Unconscious",
+  "Blessed", "Raging", "Prone", "Poisoned", "Frightened",
+  "Restrained", "Stunned", "Invisible", "Concentrating", "Unconscious",
 ];
 
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
+function clamp(v, min, max) {
+  return Math.max(min, Math.min(max, v));
 }
 
 function loadSaved(key, fallback) {
@@ -28,6 +23,18 @@ function loadSaved(key, fallback) {
 
 export default function App() {
   const [log, setLog] = useState(() => loadSaved("log", []));
+  const [bridgeUrl, setBridgeUrl] = useState(() => loadSaved("bridgeUrl", BRIDGE_DEFAULT));
+  const [apiKey, setApiKey] = useState(() => loadSaved("apiKey", ""));
+  const [channel, setChannel] = useState(() => loadSaved("channel", "dm-control-room"));
+  const [customMsg, setCustomMsg] = useState("");
+
+  const [calendar, setCalendar] = useState(() =>
+    loadSaved("calendar", { date: "6 Sunsebb, 576 CY", phase: "Morning", session: 39 })
+  );
+
+  const [earthCult, setEarthCult] = useState(() => loadSaved("earthCult", 3));
+  const [dungeonAlert, setDungeonAlert] = useState(() => loadSaved("dungeonAlert", 3));
+  const [nodeProgress, setNodeProgress] = useState(() => loadSaved("nodeProgress", 35));
 
   const [party, setParty] = useState(() =>
     loadSaved("party", [
@@ -40,11 +47,7 @@ export default function App() {
   );
 
   const [enemies, setEnemies] = useState(() => loadSaved("enemies", []));
-  const [enemyForm, setEnemyForm] = useState({
-    name: "",
-    hp: "",
-    init: "",
-  });
+  const [enemyForm, setEnemyForm] = useState({ name: "", hp: "", init: "" });
 
   const [round, setRound] = useState(() => loadSaved("round", 1));
   const [turnIndex, setTurnIndex] = useState(() => loadSaved("turnIndex", 0));
@@ -58,55 +61,84 @@ export default function App() {
     notes: "",
   });
 
+  const [sessionPrep, setSessionPrep] = useState(() => loadSaved("sessionPrep", ""));
+
   useEffect(() => localStorage.setItem("log", JSON.stringify(log)), [log]);
+  useEffect(() => localStorage.setItem("bridgeUrl", JSON.stringify(bridgeUrl)), [bridgeUrl]);
+  useEffect(() => localStorage.setItem("apiKey", JSON.stringify(apiKey)), [apiKey]);
+  useEffect(() => localStorage.setItem("channel", JSON.stringify(channel)), [channel]);
+  useEffect(() => localStorage.setItem("calendar", JSON.stringify(calendar)), [calendar]);
+  useEffect(() => localStorage.setItem("earthCult", JSON.stringify(earthCult)), [earthCult]);
+  useEffect(() => localStorage.setItem("dungeonAlert", JSON.stringify(dungeonAlert)), [dungeonAlert]);
+  useEffect(() => localStorage.setItem("nodeProgress", JSON.stringify(nodeProgress)), [nodeProgress]);
   useEffect(() => localStorage.setItem("party", JSON.stringify(party)), [party]);
   useEffect(() => localStorage.setItem("enemies", JSON.stringify(enemies)), [enemies]);
   useEffect(() => localStorage.setItem("round", JSON.stringify(round)), [round]);
   useEffect(() => localStorage.setItem("turnIndex", JSON.stringify(turnIndex)), [turnIndex]);
   useEffect(() => localStorage.setItem("npcs", JSON.stringify(npcs)), [npcs]);
+  useEffect(() => localStorage.setItem("sessionPrep", JSON.stringify(sessionPrep)), [sessionPrep]);
 
-  const addLog = (msg) => {
+  const addLog = (msg) =>
     setLog((prev) => [`${new Date().toLocaleTimeString()} — ${msg}`, ...prev].slice(0, 50));
+
+  const postToDiscord = async (target, message) => {
+    if (!bridgeUrl || !apiKey) {
+      addLog("❌ Bridge not configured.");
+      return;
+    }
+
+    if (!message?.trim()) {
+      addLog("❌ Nothing to post.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${bridgeUrl}/discord/post`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ channel: target, message }),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      addLog(`✅ Posted to #${target}.`);
+    } catch (err) {
+      addLog(`❌ Post failed: ${err.message}`);
+    }
   };
 
-  const updatePartyField = (index, field, value) => {
+  const updatePartyField = (i, field, value) => {
     setParty((prev) =>
-      prev.map((pc, i) =>
-        i === index
-          ? {
-              ...pc,
-              [field]: field === "name" ? value : Number(value) || 0,
-            }
+      prev.map((pc, idx) =>
+        idx === i
+          ? { ...pc, [field]: field === "name" ? value : Number(value) || 0 }
           : pc
       )
     );
   };
 
-  const updatePartyHp = (index, amount) => {
-    const pc = party[index];
-
+  const updatePartyHp = (i, amount) => {
+    const pc = party[i];
     setParty((prev) =>
-      prev.map((p, i) =>
-        i === index ? { ...p, hp: clamp(p.hp + amount, 0, p.maxHp) } : p
+      prev.map((p, idx) =>
+        idx === i ? { ...p, hp: clamp(p.hp + amount, 0, p.maxHp) } : p
       )
     );
-
-    addLog(`${pc.name} ${amount < 0 ? "takes" : "heals"} ${Math.abs(amount)} HP`);
+    addLog(`${pc.name} ${amount < 0 ? "takes" : "heals"} ${Math.abs(amount)} HP.`);
   };
 
-  const toggleCondition = (index, condition) => {
+  const toggleCondition = (i, condition) => {
     setParty((prev) =>
-      prev.map((pc, i) => {
-        if (i !== index) return pc;
-
-        const current = pc.conditions || [];
-        const active = current.includes(condition);
-
+      prev.map((pc, idx) => {
+        if (idx !== i) return pc;
+        const has = pc.conditions.includes(condition);
         return {
           ...pc,
-          conditions: active
-            ? current.filter((c) => c !== condition)
-            : [...current, condition],
+          conditions: has
+            ? pc.conditions.filter((c) => c !== condition)
+            : [...pc.conditions, condition],
         };
       })
     );
@@ -125,7 +157,7 @@ export default function App() {
 
     setEnemies((prev) => [...prev, enemy]);
     setEnemyForm({ name: "", hp: "", init: "" });
-    addLog(`Enemy added: ${enemy.name}`);
+    addLog(`Enemy added: ${enemy.name}.`);
   };
 
   const updateEnemyHp = (id, amount) => {
@@ -137,27 +169,21 @@ export default function App() {
       )
     );
 
-    if (enemy) {
-      addLog(`${enemy.name} ${amount < 0 ? "takes" : "heals"} ${Math.abs(amount)} HP`);
-    }
+    if (enemy) addLog(`${enemy.name} ${amount < 0 ? "takes" : "heals"} ${Math.abs(amount)} HP.`);
   };
 
   const removeEnemy = (id) => {
     const enemy = enemies.find((e) => e.id === id);
     setEnemies((prev) => prev.filter((e) => e.id !== id));
-    if (enemy) addLog(`Enemy removed: ${enemy.name}`);
+    if (enemy) addLog(`Enemy removed: ${enemy.name}.`);
   };
 
   const addNpc = () => {
     if (!npcForm.name.trim()) return;
 
-    const npc = {
-      id: Date.now(),
-      ...npcForm,
-      name: npcForm.name.trim(),
-    };
-
+    const npc = { id: Date.now(), ...npcForm, name: npcForm.name.trim() };
     setNpcs((prev) => [...prev, npc]);
+
     setNpcForm({
       name: "",
       role: "",
@@ -166,22 +192,19 @@ export default function App() {
       notes: "",
     });
 
-    addLog(`NPC added: ${npc.name}`);
+    addLog(`NPC added: ${npc.name}.`);
   };
 
   const removeNpc = (id) => {
     const npc = npcs.find((n) => n.id === id);
     setNpcs((prev) => prev.filter((n) => n.id !== id));
-    if (npc) addLog(`NPC removed: ${npc.name}`);
+    if (npc) addLog(`NPC removed: ${npc.name}.`);
   };
 
   const initiative = useMemo(() => {
     const pcs = party.map((p, i) => ({ ...p, id: `pc-${i}`, type: "PC" }));
     const foes = enemies.map((e) => ({ ...e, id: `enemy-${e.id}`, type: "Enemy" }));
-
-    return [...pcs, ...foes].sort(
-      (a, b) => b.init - a.init || a.name.localeCompare(b.name)
-    );
+    return [...pcs, ...foes].sort((a, b) => b.init - a.init || a.name.localeCompare(b.name));
   }, [party, enemies]);
 
   const active = initiative[turnIndex] || null;
@@ -194,17 +217,17 @@ export default function App() {
     if (next >= initiative.length) {
       setTurnIndex(0);
       setRound((r) => r + 1);
-      addLog(`Round ${round + 1} begins`);
+      addLog(`Round ${round + 1} begins.`);
     } else {
       setTurnIndex(next);
-      addLog(`Turn advances to ${initiative[next].name}`);
+      addLog(`Turn advances to ${initiative[next].name}.`);
     }
   };
 
   const resetCombat = () => {
     setRound(1);
     setTurnIndex(0);
-    addLog("Combat reset");
+    addLog("Combat reset.");
   };
 
   const loadCultAmbush = () => {
@@ -213,10 +236,59 @@ export default function App() {
       { id: Date.now() + 2, name: "Cultist Acolyte", hp: 9, maxHp: 9, init: 10 },
       { id: Date.now() + 3, name: "Dark Adept", hp: 22, maxHp: 22, init: 14 },
     ]);
-
     setRound(1);
     setTurnIndex(0);
-    addLog("Encounter loaded: Cult Ambush");
+    addLog("Encounter loaded: Cult Ambush.");
+  };
+
+  const buildPrep = () => `## 🕯️ Session Prep
+
+**Date:** ${calendar.date}, ${calendar.phase}
+**Session:** #${calendar.session}
+**Earth Cult Alert:** ${earthCult}/5
+**Dungeon Alert:** ${dungeonAlert}/5
+**Earth Node Progress:** ${nodeProgress}%
+
+### Notes
+- Encounter ideas
+- NPC reactions
+- Treasure hooks`;
+
+  const buildSnapshot = () => {
+    const partyText = party
+      .map((p) => {
+        const cond = p.conditions.length ? ` | ${p.conditions.join(", ")}` : "";
+        return `${p.name}: ${p.hp}/${p.maxHp} HP | AC ${p.ac} | Init ${p.init}${cond}`;
+      })
+      .join("\n");
+
+    const enemyText = enemies.length
+      ? enemies.map((e) => `${e.name}: ${e.hp}/${e.maxHp} HP | Init ${e.init}`).join("\n")
+      : "None";
+
+    const initiativeText = initiative
+      .map((c, idx) => `${idx === turnIndex ? "▶ " : ""}${c.init} — ${c.name} (${c.type})`)
+      .join("\n");
+
+    return `📊 **SESSION SNAPSHOT**
+
+🎯 **Combat**
+Round: ${round}
+Current: ${active ? active.name : "N/A"}
+
+🧙 **Party**
+${partyText}
+
+👹 **Enemies**
+${enemyText}
+
+⚔️ **Initiative**
+${initiativeText}
+
+🌍 **World State**
+Earth Cult Alert: ${earthCult}/5
+Dungeon Alert: ${dungeonAlert}/5
+Earth Node Progress: ${nodeProgress}%`;
   };
 
   const resetSavedState = () => {
@@ -226,173 +298,115 @@ export default function App() {
 
   return (
     <div style={pageStyle}>
-      <h1 style={titleStyle}>Greyhawk Command Console</h1>
+      <h1 style={titleStyle}>Greyhawk Command Console v2</h1>
 
       <main style={gridStyle}>
-        <section style={cardStyle}>
-          <h2 style={headerStyle}>Combat</h2>
-          <p>
-            <strong>Round:</strong> {round}
-          </p>
-          <p>
-            <strong>Current:</strong> {active ? `${active.name} (${active.type})` : "None"}
-          </p>
+        <Panel title="Discord Bridge">
+          <input style={inputStyle} value={bridgeUrl} onChange={(e) => setBridgeUrl(e.target.value)} />
+          <input style={inputStyle} type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
+        </Panel>
 
+        <Panel title="Calendar / Time">
+          <div>{calendar.date}</div>
+          <div>{calendar.phase}</div>
+          <button style={buttonStyle} onClick={() => setCalendar((c) => ({ ...c, phase: "Evening" }))}>Evening</button>
+          <button style={buttonStyle} onClick={() => setCalendar((c) => ({ ...c, phase: "Morning" }))}>Morning</button>
+        </Panel>
+
+        <Panel title="Faction / Node">
+          <div>Earth Cult: {earthCult}/5</div>
+          <div>Dungeon: {dungeonAlert}/5</div>
+          <div>Earth Node: {nodeProgress}%</div>
+          <button style={smallButtonStyle} onClick={() => setEarthCult((v) => clamp(v + 1, 0, 5))}>Cult +</button>
+          <button style={smallButtonStyle} onClick={() => setDungeonAlert((v) => clamp(v + 1, 0, 5))}>Dungeon +</button>
+          <button style={smallButtonStyle} onClick={() => setNodeProgress((v) => clamp(v + 10, 0, 100))}>Node +</button>
+        </Panel>
+
+        <Panel title="Combat" span={2}>
+          <div><strong>Round:</strong> {round}</div>
+          <div><strong>Current:</strong> {active ? `${active.name} (${active.type})` : "None"}</div>
           <button style={buttonStyle} onClick={nextTurn}>Next Turn</button>
-          <button style={buttonStyle} onClick={resetCombat}>Reset Combat</button>
-          <button style={buttonStyle} onClick={loadCultAmbush}>Load Cult Ambush</button>
+          <button style={buttonStyle} onClick={resetCombat}>Reset</button>
+          <button style={buttonStyle} onClick={loadCultAmbush}>Cult Ambush</button>
 
           <div style={{ marginTop: 10 }}>
-            {initiative.map((actor, i) => (
-              <div
-                key={`${actor.type}-${actor.id}`}
-                style={i === turnIndex ? activeRowStyle : initRowStyle}
-              >
+            {initiative.map((c, i) => (
+              <div key={`${c.type}-${c.id}`} style={i === turnIndex ? activeRowStyle : rowStyle}>
                 {i === turnIndex ? "▶ " : ""}
-                <strong>{actor.init}</strong> — {actor.name} ({actor.type}) — {actor.hp}/{actor.maxHp} HP
+                <strong>{c.init}</strong> — {c.name} ({c.type}) — {c.hp}/{c.maxHp} HP
               </div>
             ))}
           </div>
-        </section>
+        </Panel>
 
-        <section style={cardStyle}>
-          <h2 style={headerStyle}>Party</h2>
+        <Panel title="Party" span={2}>
+          {party.map((p, i) => (
+            <div key={`${p.name}-${i}`} style={innerCardStyle}>
+              <input style={inputStyle} value={p.name} onChange={(e) => updatePartyField(i, "name", e.target.value)} />
 
-          {party.map((pc, i) => (
-            <div key={pc.name} style={innerCardStyle}>
-              <input
-                style={inputStyle}
-                value={pc.name}
-                onChange={(e) => updatePartyField(i, "name", e.target.value)}
-              />
-
-              <div style={rowStyle}>
+              <div style={flexRowStyle}>
                 <span>HP</span>
-                <input
-                  style={smallInputStyle}
-                  value={pc.hp}
-                  onChange={(e) => updatePartyField(i, "hp", e.target.value)}
-                />
+                <input style={smallInputStyle} value={p.hp} onChange={(e) => updatePartyField(i, "hp", e.target.value)} />
                 <span>/</span>
-                <input
-                  style={smallInputStyle}
-                  value={pc.maxHp}
-                  onChange={(e) => updatePartyField(i, "maxHp", e.target.value)}
-                />
+                <input style={smallInputStyle} value={p.maxHp} onChange={(e) => updatePartyField(i, "maxHp", e.target.value)} />
                 <span>AC</span>
-                <input
-                  style={smallInputStyle}
-                  value={pc.ac}
-                  onChange={(e) => updatePartyField(i, "ac", e.target.value)}
-                />
+                <input style={smallInputStyle} value={p.ac} onChange={(e) => updatePartyField(i, "ac", e.target.value)} />
                 <span>Init</span>
-                <input
-                  style={smallInputStyle}
-                  value={pc.init}
-                  onChange={(e) => updatePartyField(i, "init", e.target.value)}
-                />
+                <input style={smallInputStyle} value={p.init} onChange={(e) => updatePartyField(i, "init", e.target.value)} />
+                <button style={smallButtonStyle} onClick={() => updatePartyHp(i, -5)}>-5</button>
+                <button style={smallButtonStyle} onClick={() => updatePartyHp(i, 5)}>+5</button>
               </div>
 
-              <button style={smallButtonStyle} onClick={() => updatePartyHp(i, -5)}>-5</button>
-              <button style={smallButtonStyle} onClick={() => updatePartyHp(i, 5)}>+5</button>
-
               <div style={conditionWrapStyle}>
-                {CONDITIONS.map((condition) => {
-                  const active = pc.conditions.includes(condition);
+                {CONDITIONS.map((c) => {
+                  const activeCondition = p.conditions.includes(c);
                   return (
                     <button
-                      key={condition}
-                      onClick={() => toggleCondition(i, condition)}
+                      key={c}
+                      onClick={() => toggleCondition(i, c)}
                       style={{
                         ...conditionButtonStyle,
-                        background: active ? "#8a6d1d" : "#1f2937",
-                        color: active ? "#fff2b8" : "#e5e7eb",
+                        background: activeCondition ? "#8a6d1d" : "#1f2937",
+                        color: activeCondition ? "#fff2b8" : "#e5e7eb",
                       }}
                     >
-                      {condition}
+                      {c}
                     </button>
                   );
                 })}
               </div>
             </div>
           ))}
-        </section>
+        </Panel>
 
-        <section style={cardStyle}>
-          <h2 style={headerStyle}>Enemies</h2>
-
-          <input
-            style={inputStyle}
-            placeholder="Enemy name"
-            value={enemyForm.name}
-            onChange={(e) => setEnemyForm({ ...enemyForm, name: e.target.value })}
-          />
-          <input
-            style={inputStyle}
-            placeholder="HP"
-            value={enemyForm.hp}
-            onChange={(e) => setEnemyForm({ ...enemyForm, hp: e.target.value })}
-          />
-          <input
-            style={inputStyle}
-            placeholder="Initiative"
-            value={enemyForm.init}
-            onChange={(e) => setEnemyForm({ ...enemyForm, init: e.target.value })}
-          />
-
+        <Panel title="Enemies">
+          <input style={inputStyle} placeholder="Enemy name" value={enemyForm.name} onChange={(e) => setEnemyForm({ ...enemyForm, name: e.target.value })} />
+          <input style={inputStyle} placeholder="HP" value={enemyForm.hp} onChange={(e) => setEnemyForm({ ...enemyForm, hp: e.target.value })} />
+          <input style={inputStyle} placeholder="Initiative" value={enemyForm.init} onChange={(e) => setEnemyForm({ ...enemyForm, init: e.target.value })} />
           <button style={buttonStyle} onClick={addEnemy}>Add Enemy</button>
 
-          {enemies.map((enemy) => (
-            <div key={enemy.id} style={innerCardStyle}>
-              <strong>{enemy.name}</strong>
-              <div>{enemy.hp}/{enemy.maxHp} HP | Init {enemy.init}</div>
-              <button style={smallButtonStyle} onClick={() => updateEnemyHp(enemy.id, -5)}>-5</button>
-              <button style={smallButtonStyle} onClick={() => updateEnemyHp(enemy.id, 5)}>+5</button>
-              <button style={dangerButtonStyle} onClick={() => removeEnemy(enemy.id)}>Remove</button>
+          {enemies.map((e) => (
+            <div key={e.id} style={innerCardStyle}>
+              <strong>{e.name}</strong>
+              <div>{e.hp}/{e.maxHp} HP | Init {e.init}</div>
+              <button style={smallButtonStyle} onClick={() => updateEnemyHp(e.id, -5)}>-5</button>
+              <button style={smallButtonStyle} onClick={() => updateEnemyHp(e.id, 5)}>+5</button>
+              <button style={dangerButtonStyle} onClick={() => removeEnemy(e.id)}>Remove</button>
             </div>
           ))}
-        </section>
+        </Panel>
 
-        <section style={cardStyle}>
-          <h2 style={headerStyle}>NPC Tracker</h2>
-
-          <input
-            style={inputStyle}
-            placeholder="NPC name"
-            value={npcForm.name}
-            onChange={(e) => setNpcForm({ ...npcForm, name: e.target.value })}
-          />
-          <input
-            style={inputStyle}
-            placeholder="Role"
-            value={npcForm.role}
-            onChange={(e) => setNpcForm({ ...npcForm, role: e.target.value })}
-          />
-          <input
-            style={inputStyle}
-            placeholder="Faction"
-            value={npcForm.faction}
-            onChange={(e) => setNpcForm({ ...npcForm, faction: e.target.value })}
-          />
-
-          <select
-            style={inputStyle}
-            value={npcForm.attitude}
-            onChange={(e) => setNpcForm({ ...npcForm, attitude: e.target.value })}
-          >
+        <Panel title="NPC Tracker">
+          <input style={inputStyle} placeholder="NPC name" value={npcForm.name} onChange={(e) => setNpcForm({ ...npcForm, name: e.target.value })} />
+          <input style={inputStyle} placeholder="Role" value={npcForm.role} onChange={(e) => setNpcForm({ ...npcForm, role: e.target.value })} />
+          <input style={inputStyle} placeholder="Faction" value={npcForm.faction} onChange={(e) => setNpcForm({ ...npcForm, faction: e.target.value })} />
+          <select style={inputStyle} value={npcForm.attitude} onChange={(e) => setNpcForm({ ...npcForm, attitude: e.target.value })}>
             <option>Friendly</option>
             <option>Neutral</option>
             <option>Suspicious</option>
             <option>Hostile</option>
           </select>
-
-          <textarea
-            style={textAreaStyle}
-            placeholder="Notes"
-            value={npcForm.notes}
-            onChange={(e) => setNpcForm({ ...npcForm, notes: e.target.value })}
-          />
-
+          <textarea style={textAreaStyle} placeholder="Notes" value={npcForm.notes} onChange={(e) => setNpcForm({ ...npcForm, notes: e.target.value })} />
           <button style={buttonStyle} onClick={addNpc}>Add NPC</button>
 
           {npcs.map((npc) => (
@@ -404,21 +418,47 @@ export default function App() {
               <button style={dangerButtonStyle} onClick={() => removeNpc(npc.id)}>Remove</button>
             </div>
           ))}
-        </section>
+        </Panel>
 
-        <section style={cardStyle}>
-          <h2 style={headerStyle}>Log</h2>
+        <Panel title="Session Prep">
+          <button style={buttonStyle} onClick={() => setSessionPrep(buildPrep())}>Auto Fill</button>
+          <button style={buttonStyle} onClick={() => postToDiscord("session-prep", sessionPrep || buildPrep())}>Post</button>
+          <textarea style={textAreaStyle} value={sessionPrep} onChange={(e) => setSessionPrep(e.target.value)} />
+        </Panel>
+
+        <Panel title="Post to Channel">
+          <select style={inputStyle} value={channel} onChange={(e) => setChannel(e.target.value)}>
+            <option value="dm-control-room">#dm-control-room</option>
+            <option value="bard-tales">#bard-tales</option>
+            <option value="session-prep">#session-prep</option>
+            <option value="cult-activity-log">#cult-activity-log</option>
+            <option value="help-wanted-table">#help-wanted-table</option>
+          </select>
+          <textarea style={textAreaStyle} value={customMsg} onChange={(e) => setCustomMsg(e.target.value)} />
+          <button style={buttonStyle} onClick={() => postToDiscord(channel, customMsg)}>Post Message</button>
+        </Panel>
+
+        <Panel title="DM Actions">
+          <button style={buttonStyle} onClick={() => postToDiscord("dm-control-room", buildSnapshot())}>📊 DM Snapshot</button>
           <button style={dangerButtonStyle} onClick={resetSavedState}>Reset Saved State</button>
+        </Panel>
+
+        <Panel title="Log" span={2}>
           <div style={logBoxStyle}>
-            {log.length === 0 ? (
-              <p>No actions yet.</p>
-            ) : (
-              log.map((entry, i) => <div key={i}>• {entry}</div>)
-            )}
+            {log.length === 0 ? <p>No actions yet.</p> : log.map((l, i) => <div key={i}>• {l}</div>)}
           </div>
-        </section>
+        </Panel>
       </main>
     </div>
+  );
+}
+
+function Panel({ title, children, span = 1 }) {
+  return (
+    <section style={{ ...cardStyle, gridColumn: `span ${span}` }}>
+      <h2 style={panelTitleStyle}>{title}</h2>
+      {children}
+    </section>
   );
 }
 
@@ -441,7 +481,7 @@ const titleStyle = {
 
 const gridStyle = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
   gap: 12,
   width: "100%",
   boxSizing: "border-box",
@@ -451,7 +491,7 @@ const cardStyle = {
   background: "#0d1117",
   border: "1px solid #3b4351",
   borderRadius: 8,
-  padding: 10,
+  padding: 12,
   boxSizing: "border-box",
   minWidth: 0,
 };
@@ -464,19 +504,13 @@ const innerCardStyle = {
   marginBottom: 8,
 };
 
-const headerStyle = {
+const panelTitleStyle = {
   color: "#f2d28b",
-  marginTop: 0,
+  margin: "0 0 8px",
   borderBottom: "1px solid #35291a",
   paddingBottom: 4,
-};
-
-const rowStyle = {
-  display: "flex",
-  gap: 6,
-  alignItems: "center",
-  flexWrap: "wrap",
-  marginBottom: 6,
+  textTransform: "uppercase",
+  fontSize: 17,
 };
 
 const inputStyle = {
@@ -489,7 +523,6 @@ const inputStyle = {
   borderRadius: 6,
   boxSizing: "border-box",
   fontSize: 14,
-  minHeight: 38,
 };
 
 const smallInputStyle = {
@@ -510,20 +543,25 @@ const buttonStyle = {
   cursor: "pointer",
   margin: 4,
   fontSize: 14,
-  minHeight: 38,
 };
 
 const smallButtonStyle = {
   ...buttonStyle,
   padding: "6px 9px",
   fontSize: 13,
-  minHeight: 34,
 };
 
 const dangerButtonStyle = {
   ...smallButtonStyle,
   background: "linear-gradient(180deg, #7f1d1d 0%, #3f1111 100%)",
   border: "1px solid #b91c1c",
+};
+
+const flexRowStyle = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 6,
+  alignItems: "center",
 };
 
 const conditionWrapStyle = {
@@ -538,9 +576,10 @@ const conditionButtonStyle = {
   borderRadius: 4,
   padding: "4px 6px",
   fontSize: 11,
+  cursor: "pointer",
 };
 
-const initRowStyle = {
+const rowStyle = {
   padding: 10,
   marginBottom: 6,
   border: "1px solid #303845",
@@ -550,7 +589,7 @@ const initRowStyle = {
 };
 
 const activeRowStyle = {
-  ...initRowStyle,
+  ...rowStyle,
   background: "#4a3415",
   border: "1px solid #d6a03d",
 };
