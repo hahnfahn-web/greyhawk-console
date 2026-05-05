@@ -21,7 +21,22 @@ function loadSaved(key, fallback) {
   }
 }
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 900);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  return isMobile;
+}
+
 export default function App() {
+  const isMobile = useIsMobile();
+
   const [log, setLog] = useState(() => loadSaved("log", []));
   const [bridgeUrl, setBridgeUrl] = useState(() => loadSaved("bridgeUrl", BRIDGE_DEFAULT));
   const [apiKey, setApiKey] = useState(() => loadSaved("apiKey", ""));
@@ -162,13 +177,11 @@ export default function App() {
 
   const updateEnemyHp = (id, amount) => {
     const enemy = enemies.find((e) => e.id === id);
-
     setEnemies((prev) =>
       prev.map((e) =>
         e.id === id ? { ...e, hp: clamp(e.hp + amount, 0, e.maxHp) } : e
       )
     );
-
     if (enemy) addLog(`${enemy.name} ${amount < 0 ? "takes" : "heals"} ${Math.abs(amount)} HP.`);
   };
 
@@ -180,18 +193,9 @@ export default function App() {
 
   const addNpc = () => {
     if (!npcForm.name.trim()) return;
-
     const npc = { id: Date.now(), ...npcForm, name: npcForm.name.trim() };
     setNpcs((prev) => [...prev, npc]);
-
-    setNpcForm({
-      name: "",
-      role: "",
-      faction: "",
-      attitude: "Neutral",
-      notes: "",
-    });
-
+    setNpcForm({ name: "", role: "", faction: "", attitude: "Neutral", notes: "" });
     addLog(`NPC added: ${npc.name}.`);
   };
 
@@ -211,9 +215,7 @@ export default function App() {
 
   const nextTurn = () => {
     if (!initiative.length) return;
-
     const next = turnIndex + 1;
-
     if (next >= initiative.length) {
       setTurnIndex(0);
       setRound((r) => r + 1);
@@ -296,169 +298,229 @@ Earth Node Progress: ${nodeProgress}%`;
     window.location.reload();
   };
 
+  const layoutStyle = isMobile ? mobileGridStyle : desktopGridStyle;
+
   return (
     <div style={pageStyle}>
       <h1 style={titleStyle}>Greyhawk Command Console v2</h1>
 
-      <main style={gridStyle}>
-        <Panel title="Discord Bridge">
-          <input style={inputStyle} value={bridgeUrl} onChange={(e) => setBridgeUrl(e.target.value)} />
-          <input style={inputStyle} type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
-        </Panel>
+      <main style={layoutStyle}>
+        <div style={leftColumnStyle}>
+          <PartyPanel
+            party={party}
+            updatePartyField={updatePartyField}
+            updatePartyHp={updatePartyHp}
+            toggleCondition={toggleCondition}
+          />
+          <NpcPanel
+            npcs={npcs}
+            npcForm={npcForm}
+            setNpcForm={setNpcForm}
+            addNpc={addNpc}
+            removeNpc={removeNpc}
+          />
+        </div>
 
-        <Panel title="Calendar / Time">
-          <div>{calendar.date}</div>
-          <div>{calendar.phase}</div>
-          <button style={buttonStyle} onClick={() => setCalendar((c) => ({ ...c, phase: "Evening" }))}>Evening</button>
-          <button style={buttonStyle} onClick={() => setCalendar((c) => ({ ...c, phase: "Morning" }))}>Morning</button>
-        </Panel>
+        <div style={topBarStyle}>
+          <Panel title="Discord Bridge">
+            <input style={inputStyle} value={bridgeUrl} onChange={(e) => setBridgeUrl(e.target.value)} />
+            <input style={inputStyle} type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
+          </Panel>
 
-        <Panel title="Faction / Node">
-          <div>Earth Cult: {earthCult}/5</div>
-          <div>Dungeon: {dungeonAlert}/5</div>
-          <div>Earth Node: {nodeProgress}%</div>
-          <button style={smallButtonStyle} onClick={() => setEarthCult((v) => clamp(v + 1, 0, 5))}>Cult +</button>
-          <button style={smallButtonStyle} onClick={() => setDungeonAlert((v) => clamp(v + 1, 0, 5))}>Dungeon +</button>
-          <button style={smallButtonStyle} onClick={() => setNodeProgress((v) => clamp(v + 10, 0, 100))}>Node +</button>
-        </Panel>
+          <Panel title="Calendar / Time">
+            <div>{calendar.date}</div>
+            <div>{calendar.phase}</div>
+            <button style={buttonStyle} onClick={() => setCalendar((c) => ({ ...c, phase: "Evening" }))}>Evening</button>
+            <button style={buttonStyle} onClick={() => setCalendar((c) => ({ ...c, phase: "Morning" }))}>Morning</button>
+          </Panel>
 
-        <Panel title="Combat" span={2}>
-          <div><strong>Round:</strong> {round}</div>
-          <div><strong>Current:</strong> {active ? `${active.name} (${active.type})` : "None"}</div>
-          <button style={buttonStyle} onClick={nextTurn}>Next Turn</button>
-          <button style={buttonStyle} onClick={resetCombat}>Reset</button>
-          <button style={buttonStyle} onClick={loadCultAmbush}>Cult Ambush</button>
+          <Panel title="Faction / Node">
+            <div>Earth Cult: {earthCult}/5</div>
+            <div>Dungeon: {dungeonAlert}/5</div>
+            <div>Earth Node: {nodeProgress}%</div>
+            <button style={smallButtonStyle} onClick={() => setEarthCult((v) => clamp(v + 1, 0, 5))}>Cult +</button>
+            <button style={smallButtonStyle} onClick={() => setDungeonAlert((v) => clamp(v + 1, 0, 5))}>Dungeon +</button>
+            <button style={smallButtonStyle} onClick={() => setNodeProgress((v) => clamp(v + 10, 0, 100))}>Node +</button>
+          </Panel>
+        </div>
 
-          <div style={{ marginTop: 10 }}>
-            {initiative.map((c, i) => (
-              <div key={`${c.type}-${c.id}`} style={i === turnIndex ? activeRowStyle : rowStyle}>
-                {i === turnIndex ? "▶ " : ""}
-                <strong>{c.init}</strong> — {c.name} ({c.type}) — {c.hp}/{c.maxHp} HP
-              </div>
-            ))}
-          </div>
-        </Panel>
+        <div style={centerColumnStyle}>
+          <CombatPanel
+            round={round}
+            active={active}
+            initiative={initiative}
+            turnIndex={turnIndex}
+            nextTurn={nextTurn}
+            resetCombat={resetCombat}
+            loadCultAmbush={loadCultAmbush}
+          />
+        </div>
 
-        <Panel title="Party" span={2}>
-          {party.map((p, i) => (
-            <div key={`${p.name}-${i}`} style={innerCardStyle}>
-              <input style={inputStyle} value={p.name} onChange={(e) => updatePartyField(i, "name", e.target.value)} />
+        <div style={rightColumnStyle}>
+          <EnemiesPanel
+            enemies={enemies}
+            enemyForm={enemyForm}
+            setEnemyForm={setEnemyForm}
+            addEnemy={addEnemy}
+            updateEnemyHp={updateEnemyHp}
+            removeEnemy={removeEnemy}
+          />
 
-              <div style={flexRowStyle}>
-                <span>HP</span>
-                <input style={smallInputStyle} value={p.hp} onChange={(e) => updatePartyField(i, "hp", e.target.value)} />
-                <span>/</span>
-                <input style={smallInputStyle} value={p.maxHp} onChange={(e) => updatePartyField(i, "maxHp", e.target.value)} />
-                <span>AC</span>
-                <input style={smallInputStyle} value={p.ac} onChange={(e) => updatePartyField(i, "ac", e.target.value)} />
-                <span>Init</span>
-                <input style={smallInputStyle} value={p.init} onChange={(e) => updatePartyField(i, "init", e.target.value)} />
-                <button style={smallButtonStyle} onClick={() => updatePartyHp(i, -5)}>-5</button>
-                <button style={smallButtonStyle} onClick={() => updatePartyHp(i, 5)}>+5</button>
-              </div>
+          <Panel title="Session Prep">
+            <button style={buttonStyle} onClick={() => setSessionPrep(buildPrep())}>Auto Fill</button>
+            <button style={buttonStyle} onClick={() => postToDiscord("session-prep", sessionPrep || buildPrep())}>Post</button>
+            <textarea style={textAreaStyle} value={sessionPrep} onChange={(e) => setSessionPrep(e.target.value)} />
+          </Panel>
 
-              <div style={conditionWrapStyle}>
-                {CONDITIONS.map((c) => {
-                  const activeCondition = p.conditions.includes(c);
-                  return (
-                    <button
-                      key={c}
-                      onClick={() => toggleCondition(i, c)}
-                      style={{
-                        ...conditionButtonStyle,
-                        background: activeCondition ? "#8a6d1d" : "#1f2937",
-                        color: activeCondition ? "#fff2b8" : "#e5e7eb",
-                      }}
-                    >
-                      {c}
-                    </button>
-                  );
-                })}
-              </div>
+          <Panel title="Post to Channel">
+            <select style={inputStyle} value={channel} onChange={(e) => setChannel(e.target.value)}>
+              <option value="dm-control-room">#dm-control-room</option>
+              <option value="bard-tales">#bard-tales</option>
+              <option value="session-prep">#session-prep</option>
+              <option value="cult-activity-log">#cult-activity-log</option>
+              <option value="help-wanted-table">#help-wanted-table</option>
+            </select>
+            <textarea style={textAreaStyle} value={customMsg} onChange={(e) => setCustomMsg(e.target.value)} />
+            <button style={buttonStyle} onClick={() => postToDiscord(channel, customMsg)}>Post Message</button>
+          </Panel>
+
+          <Panel title="DM Actions">
+            <button style={buttonStyle} onClick={() => postToDiscord("dm-control-room", buildSnapshot())}>📊 DM Snapshot</button>
+            <button style={dangerButtonStyle} onClick={resetSavedState}>Reset Saved State</button>
+          </Panel>
+        </div>
+
+        <div style={bottomBarStyle}>
+          <Panel title="Log">
+            <div style={logBoxStyle}>
+              {log.length === 0 ? <p>No actions yet.</p> : log.map((l, i) => <div key={i}>• {l}</div>)}
             </div>
-          ))}
-        </Panel>
-
-        <Panel title="Enemies">
-          <input style={inputStyle} placeholder="Enemy name" value={enemyForm.name} onChange={(e) => setEnemyForm({ ...enemyForm, name: e.target.value })} />
-          <input style={inputStyle} placeholder="HP" value={enemyForm.hp} onChange={(e) => setEnemyForm({ ...enemyForm, hp: e.target.value })} />
-          <input style={inputStyle} placeholder="Initiative" value={enemyForm.init} onChange={(e) => setEnemyForm({ ...enemyForm, init: e.target.value })} />
-          <button style={buttonStyle} onClick={addEnemy}>Add Enemy</button>
-
-          {enemies.map((e) => (
-            <div key={e.id} style={innerCardStyle}>
-              <strong>{e.name}</strong>
-              <div>{e.hp}/{e.maxHp} HP | Init {e.init}</div>
-              <button style={smallButtonStyle} onClick={() => updateEnemyHp(e.id, -5)}>-5</button>
-              <button style={smallButtonStyle} onClick={() => updateEnemyHp(e.id, 5)}>+5</button>
-              <button style={dangerButtonStyle} onClick={() => removeEnemy(e.id)}>Remove</button>
-            </div>
-          ))}
-        </Panel>
-
-        <Panel title="NPC Tracker">
-          <input style={inputStyle} placeholder="NPC name" value={npcForm.name} onChange={(e) => setNpcForm({ ...npcForm, name: e.target.value })} />
-          <input style={inputStyle} placeholder="Role" value={npcForm.role} onChange={(e) => setNpcForm({ ...npcForm, role: e.target.value })} />
-          <input style={inputStyle} placeholder="Faction" value={npcForm.faction} onChange={(e) => setNpcForm({ ...npcForm, faction: e.target.value })} />
-          <select style={inputStyle} value={npcForm.attitude} onChange={(e) => setNpcForm({ ...npcForm, attitude: e.target.value })}>
-            <option>Friendly</option>
-            <option>Neutral</option>
-            <option>Suspicious</option>
-            <option>Hostile</option>
-          </select>
-          <textarea style={textAreaStyle} placeholder="Notes" value={npcForm.notes} onChange={(e) => setNpcForm({ ...npcForm, notes: e.target.value })} />
-          <button style={buttonStyle} onClick={addNpc}>Add NPC</button>
-
-          {npcs.map((npc) => (
-            <div key={npc.id} style={innerCardStyle}>
-              <strong>{npc.name}</strong>
-              <div>{npc.role || "Unknown role"} | {npc.faction || "No faction"}</div>
-              <div><em>{npc.attitude}</em></div>
-              <p>{npc.notes}</p>
-              <button style={dangerButtonStyle} onClick={() => removeNpc(npc.id)}>Remove</button>
-            </div>
-          ))}
-        </Panel>
-
-        <Panel title="Session Prep">
-          <button style={buttonStyle} onClick={() => setSessionPrep(buildPrep())}>Auto Fill</button>
-          <button style={buttonStyle} onClick={() => postToDiscord("session-prep", sessionPrep || buildPrep())}>Post</button>
-          <textarea style={textAreaStyle} value={sessionPrep} onChange={(e) => setSessionPrep(e.target.value)} />
-        </Panel>
-
-        <Panel title="Post to Channel">
-          <select style={inputStyle} value={channel} onChange={(e) => setChannel(e.target.value)}>
-            <option value="dm-control-room">#dm-control-room</option>
-            <option value="bard-tales">#bard-tales</option>
-            <option value="session-prep">#session-prep</option>
-            <option value="cult-activity-log">#cult-activity-log</option>
-            <option value="help-wanted-table">#help-wanted-table</option>
-          </select>
-          <textarea style={textAreaStyle} value={customMsg} onChange={(e) => setCustomMsg(e.target.value)} />
-          <button style={buttonStyle} onClick={() => postToDiscord(channel, customMsg)}>Post Message</button>
-        </Panel>
-
-        <Panel title="DM Actions">
-          <button style={buttonStyle} onClick={() => postToDiscord("dm-control-room", buildSnapshot())}>📊 DM Snapshot</button>
-          <button style={dangerButtonStyle} onClick={resetSavedState}>Reset Saved State</button>
-        </Panel>
-
-        <Panel title="Log" span={2}>
-          <div style={logBoxStyle}>
-            {log.length === 0 ? <p>No actions yet.</p> : log.map((l, i) => <div key={i}>• {l}</div>)}
-          </div>
-        </Panel>
+          </Panel>
+        </div>
       </main>
     </div>
   );
 }
 
-function Panel({ title, children, span = 1 }) {
+function Panel({ title, children }) {
   return (
-    <section style={{ ...cardStyle, gridColumn: `span ${span}` }}>
+    <section style={cardStyle}>
       <h2 style={panelTitleStyle}>{title}</h2>
       {children}
     </section>
+  );
+}
+
+function CombatPanel({ round, active, initiative, turnIndex, nextTurn, resetCombat, loadCultAmbush }) {
+  return (
+    <Panel title="Combat">
+      <div><strong>Round:</strong> {round}</div>
+      <div><strong>Current:</strong> {active ? `${active.name} (${active.type})` : "None"}</div>
+      <button style={buttonStyle} onClick={resetCombat}>Reset</button>
+      <button style={buttonStyle} onClick={loadCultAmbush}>Cult Ambush</button>
+
+      <div style={{ marginTop: 10 }}>
+        {initiative.map((c, i) => (
+          <div key={`${c.type}-${c.id}`} style={i === turnIndex ? activeRowStyle : rowStyle}>
+            {i === turnIndex ? "▶ " : ""}
+            <strong>{c.init}</strong> — {c.name} ({c.type}) — {c.hp}/{c.maxHp} HP
+          </div>
+        ))}
+      </div>
+
+      <div style={stickyTurnBarStyle}>
+        <button style={{ ...buttonStyle, width: "100%" }} onClick={nextTurn}>▶ Next Turn</button>
+      </div>
+    </Panel>
+  );
+}
+
+function PartyPanel({ party, updatePartyField, updatePartyHp, toggleCondition }) {
+  return (
+    <Panel title="Party">
+      {party.map((p, i) => (
+        <div key={`${p.name}-${i}`} style={innerCardStyle}>
+          <input style={inputStyle} value={p.name} onChange={(e) => updatePartyField(i, "name", e.target.value)} />
+          <div style={flexRowStyle}>
+            <span>HP</span>
+            <input style={smallInputStyle} value={p.hp} onChange={(e) => updatePartyField(i, "hp", e.target.value)} />
+            <span>/</span>
+            <input style={smallInputStyle} value={p.maxHp} onChange={(e) => updatePartyField(i, "maxHp", e.target.value)} />
+            <span>AC</span>
+            <input style={smallInputStyle} value={p.ac} onChange={(e) => updatePartyField(i, "ac", e.target.value)} />
+            <span>Init</span>
+            <input style={smallInputStyle} value={p.init} onChange={(e) => updatePartyField(i, "init", e.target.value)} />
+            <button style={smallButtonStyle} onClick={() => updatePartyHp(i, -5)}>-5</button>
+            <button style={smallButtonStyle} onClick={() => updatePartyHp(i, 5)}>+5</button>
+          </div>
+          <div style={conditionWrapStyle}>
+            {CONDITIONS.map((c) => {
+              const activeCondition = p.conditions.includes(c);
+              return (
+                <button
+                  key={c}
+                  onClick={() => toggleCondition(i, c)}
+                  style={{
+                    ...conditionButtonStyle,
+                    background: activeCondition ? "#8a6d1d" : "#1f2937",
+                    color: activeCondition ? "#fff2b8" : "#e5e7eb",
+                  }}
+                >
+                  {c}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </Panel>
+  );
+}
+
+function EnemiesPanel({ enemies, enemyForm, setEnemyForm, addEnemy, updateEnemyHp, removeEnemy }) {
+  return (
+    <Panel title="Enemies">
+      <input style={inputStyle} placeholder="Enemy name" value={enemyForm.name} onChange={(e) => setEnemyForm({ ...enemyForm, name: e.target.value })} />
+      <input style={inputStyle} placeholder="HP" value={enemyForm.hp} onChange={(e) => setEnemyForm({ ...enemyForm, hp: e.target.value })} />
+      <input style={inputStyle} placeholder="Initiative" value={enemyForm.init} onChange={(e) => setEnemyForm({ ...enemyForm, init: e.target.value })} />
+      <button style={buttonStyle} onClick={addEnemy}>Add Enemy</button>
+      {enemies.map((e) => (
+        <div key={e.id} style={innerCardStyle}>
+          <strong>{e.name}</strong>
+          <div>{e.hp}/{e.maxHp} HP | Init {e.init}</div>
+          <button style={smallButtonStyle} onClick={() => updateEnemyHp(e.id, -5)}>-5</button>
+          <button style={smallButtonStyle} onClick={() => updateEnemyHp(e.id, 5)}>+5</button>
+          <button style={dangerButtonStyle} onClick={() => removeEnemy(e.id)}>Remove</button>
+        </div>
+      ))}
+    </Panel>
+  );
+}
+
+function NpcPanel({ npcs, npcForm, setNpcForm, addNpc, removeNpc }) {
+  return (
+    <Panel title="NPC Tracker">
+      <input style={inputStyle} placeholder="NPC name" value={npcForm.name} onChange={(e) => setNpcForm({ ...npcForm, name: e.target.value })} />
+      <input style={inputStyle} placeholder="Role" value={npcForm.role} onChange={(e) => setNpcForm({ ...npcForm, role: e.target.value })} />
+      <input style={inputStyle} placeholder="Faction" value={npcForm.faction} onChange={(e) => setNpcForm({ ...npcForm, faction: e.target.value })} />
+      <select style={inputStyle} value={npcForm.attitude} onChange={(e) => setNpcForm({ ...npcForm, attitude: e.target.value })}>
+        <option>Friendly</option>
+        <option>Neutral</option>
+        <option>Suspicious</option>
+        <option>Hostile</option>
+      </select>
+      <textarea style={textAreaStyle} placeholder="Notes" value={npcForm.notes} onChange={(e) => setNpcForm({ ...npcForm, notes: e.target.value })} />
+      <button style={buttonStyle} onClick={addNpc}>Add NPC</button>
+      {npcs.map((npc) => (
+        <div key={npc.id} style={innerCardStyle}>
+          <strong>{npc.name}</strong>
+          <div>{npc.role || "Unknown role"} | {npc.faction || "No faction"}</div>
+          <div><em>{npc.attitude}</em></div>
+          <p>{npc.notes}</p>
+          <button style={dangerButtonStyle} onClick={() => removeNpc(npc.id)}>Remove</button>
+        </div>
+      ))}
+    </Panel>
   );
 }
 
@@ -479,12 +541,60 @@ const titleStyle = {
   margin: "8px 0 14px",
 };
 
-const gridStyle = {
+const desktopGridStyle = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+  gridTemplateColumns: "320px 1fr 320px",
+  gridTemplateRows: "auto 1fr 180px",
+  gridTemplateAreas: `
+    "left top right"
+    "left center right"
+    "bottom bottom bottom"
+  `,
   gap: 12,
-  width: "100%",
-  boxSizing: "border-box",
+  minHeight: "calc(100vh - 80px)",
+};
+
+const mobileGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "1fr",
+  gap: 12,
+};
+
+const leftColumnStyle = {
+  gridArea: "left",
+  display: "grid",
+  gap: 12,
+  alignContent: "start",
+  minHeight: 0,
+  overflowY: "auto",
+};
+
+const topBarStyle = {
+  gridArea: "top",
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: 12,
+  alignContent: "start",
+};
+
+const centerColumnStyle = {
+  gridArea: "center",
+  minHeight: 0,
+  overflowY: "auto",
+};
+
+const rightColumnStyle = {
+  gridArea: "right",
+  display: "grid",
+  gap: 12,
+  alignContent: "start",
+  minHeight: 0,
+  overflowY: "auto",
+};
+
+const bottomBarStyle = {
+  gridArea: "bottom",
+  minHeight: 0,
 };
 
 const cardStyle = {
@@ -580,18 +690,27 @@ const conditionButtonStyle = {
 };
 
 const rowStyle = {
-  padding: 10,
-  marginBottom: 6,
+  padding: 14,
+  marginBottom: 8,
   border: "1px solid #303845",
   borderRadius: 6,
-  fontSize: 16,
+  fontSize: 18,
   background: "#1d222b",
 };
 
 const activeRowStyle = {
   ...rowStyle,
-  background: "#4a3415",
+  background: "linear-gradient(90deg, #6b4f1d, #2a2112)",
   border: "1px solid #d6a03d",
+  fontWeight: "bold",
+};
+
+const stickyTurnBarStyle = {
+  position: "sticky",
+  bottom: 0,
+  background: "#0d1117",
+  paddingTop: 10,
+  marginTop: 10,
 };
 
 const textAreaStyle = {
@@ -608,7 +727,7 @@ const textAreaStyle = {
 };
 
 const logBoxStyle = {
-  maxHeight: 250,
+  maxHeight: 135,
   overflowY: "auto",
   fontSize: 13,
 };
