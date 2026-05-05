@@ -1,8 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 
-const BRIDGE_DEFAULT =
-  "https://rolls-realms-discord-bridge-production.up.railway.app/api";
-
 const CONDITIONS = [
   "Blessed",
   "Raging",
@@ -29,41 +26,8 @@ function loadSaved(key, fallback) {
   }
 }
 
-const globalStyleId = "greyhawk-console-global-style";
-if (!document.getElementById(globalStyleId)) {
-  const globalStyle = document.createElement("style");
-  globalStyle.id = globalStyleId;
-  globalStyle.innerHTML = `
-    html, body, #root {
-      width: 100%;
-      min-width: 100%;
-      margin: 0;
-      padding: 0;
-      overflow-x: hidden;
-      background: #0b0f14;
-    }
-
-    #root {
-      display: block;
-    }
-  `;
-  document.head.appendChild(globalStyle);
-}
-
 export default function App() {
   const [log, setLog] = useState(() => loadSaved("log", []));
-  const [bridgeUrl, setBridgeUrl] = useState(() =>
-    loadSaved("bridgeUrl", BRIDGE_DEFAULT)
-  );
-  const [apiKey, setApiKey] = useState(() => loadSaved("apiKey", ""));
-
-  const [calendar, setCalendar] = useState(() =>
-    loadSaved("calendar", {
-      date: "6 Sunsebb, 576 CY",
-      phase: "Morning",
-      session: 39,
-    })
-  );
 
   const [party, setParty] = useState(() =>
     loadSaved("party", [
@@ -76,135 +40,71 @@ export default function App() {
   );
 
   const [enemies, setEnemies] = useState(() => loadSaved("enemies", []));
-  const [enemyName, setEnemyName] = useState("");
-  const [enemyHp, setEnemyHp] = useState("");
-  const [enemyInit, setEnemyInit] = useState("");
+  const [enemyForm, setEnemyForm] = useState({
+    name: "",
+    hp: "",
+    init: "",
+  });
 
   const [round, setRound] = useState(() => loadSaved("round", 1));
   const [turnIndex, setTurnIndex] = useState(() => loadSaved("turnIndex", 0));
 
-  const [dungeonAlert, setDungeonAlert] = useState(() =>
-    loadSaved("dungeonAlert", 3)
-  );
-  const [earthCult, setEarthCult] = useState(() => loadSaved("earthCult", 3));
-  const [nodeProgress, setNodeProgress] = useState(() =>
-    loadSaved("nodeProgress", 35)
-  );
-
-  const [sessionPrep, setSessionPrep] = useState(() =>
-    loadSaved("sessionPrep", "")
-  );
-  const [channel, setChannel] = useState(() =>
-    loadSaved("channel", "bard-tales")
-  );
-  const [customMsg, setCustomMsg] = useState(() =>
-    loadSaved("customMsg", "")
-  );
-
-  const [npcs, setNpcs] = useState(() =>
-    loadSaved("npcs", [
-      {
-        id: 1,
-        name: "Burne",
-        location: "Hommlet",
-        faction: "Hommlet Council",
-        attitude: "Helpful",
-        status: "Active",
-        lastSeen: "Council meeting",
-        secret: "Watching for deeper cult movement.",
-      },
-      {
-        id: 2,
-        name: "Jaroo Ashstaff",
-        location: "Hommlet",
-        faction: "Old Faith",
-        attitude: "Concerned",
-        status: "Active",
-        lastSeen: "Near the grove",
-        secret: "Senses the earth shifting unnaturally.",
-      },
-    ])
-  );
-
-  const [npcDraft, setNpcDraft] = useState({
+  const [npcs, setNpcs] = useState(() => loadSaved("npcs", []));
+  const [npcForm, setNpcForm] = useState({
     name: "",
-    location: "Hommlet",
+    role: "",
     faction: "",
     attitude: "Neutral",
-    status: "Active",
-    lastSeen: "",
-    secret: "",
+    notes: "",
   });
 
   useEffect(() => localStorage.setItem("log", JSON.stringify(log)), [log]);
-  useEffect(() => localStorage.setItem("bridgeUrl", JSON.stringify(bridgeUrl)), [bridgeUrl]);
-  useEffect(() => localStorage.setItem("apiKey", JSON.stringify(apiKey)), [apiKey]);
-  useEffect(() => localStorage.setItem("calendar", JSON.stringify(calendar)), [calendar]);
   useEffect(() => localStorage.setItem("party", JSON.stringify(party)), [party]);
   useEffect(() => localStorage.setItem("enemies", JSON.stringify(enemies)), [enemies]);
   useEffect(() => localStorage.setItem("round", JSON.stringify(round)), [round]);
   useEffect(() => localStorage.setItem("turnIndex", JSON.stringify(turnIndex)), [turnIndex]);
-  useEffect(() => localStorage.setItem("dungeonAlert", JSON.stringify(dungeonAlert)), [dungeonAlert]);
-  useEffect(() => localStorage.setItem("earthCult", JSON.stringify(earthCult)), [earthCult]);
-  useEffect(() => localStorage.setItem("nodeProgress", JSON.stringify(nodeProgress)), [nodeProgress]);
-  useEffect(() => localStorage.setItem("sessionPrep", JSON.stringify(sessionPrep)), [sessionPrep]);
-  useEffect(() => localStorage.setItem("channel", JSON.stringify(channel)), [channel]);
-  useEffect(() => localStorage.setItem("customMsg", JSON.stringify(customMsg)), [customMsg]);
   useEffect(() => localStorage.setItem("npcs", JSON.stringify(npcs)), [npcs]);
 
-  const pushLog = (msg) =>
+  const addLog = (msg) => {
     setLog((prev) => [`${new Date().toLocaleTimeString()} — ${msg}`, ...prev].slice(0, 50));
-
-  const postToDiscord = async (targetChannel, message) => {
-    if (!bridgeUrl || !apiKey) {
-      pushLog("Bridge not configured.");
-      return;
-    }
-
-    try {
-      const res = await fetch(`${bridgeUrl}/discord/post`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({ channel: targetChannel, message }),
-      });
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      pushLog(`Posted to #${targetChannel}.`);
-    } catch (err) {
-      pushLog(`Discord post failed: ${err.message}`);
-    }
   };
 
   const updatePartyField = (index, field, value) => {
     setParty((prev) =>
-      prev.map((p, i) =>
+      prev.map((pc, i) =>
         i === index
-          ? { ...p, [field]: field === "name" ? value : Number(value) || 0 }
-          : p
+          ? {
+              ...pc,
+              [field]: field === "name" ? value : Number(value) || 0,
+            }
+          : pc
       )
     );
   };
 
-  const updateHp = (index, amount) => {
+  const updatePartyHp = (index, amount) => {
+    const pc = party[index];
+
     setParty((prev) =>
       prev.map((p, i) =>
         i === index ? { ...p, hp: clamp(p.hp + amount, 0, p.maxHp) } : p
       )
     );
-    pushLog(`${party[index].name} ${amount < 0 ? "takes" : "heals"} ${Math.abs(amount)} HP.`);
+
+    addLog(`${pc.name} ${amount < 0 ? "takes" : "heals"} ${Math.abs(amount)} HP`);
   };
 
   const toggleCondition = (index, condition) => {
     setParty((prev) =>
-      prev.map((p, i) => {
-        if (i !== index) return p;
-        const current = p.conditions || [];
+      prev.map((pc, i) => {
+        if (i !== index) return pc;
+
+        const current = pc.conditions || [];
+        const active = current.includes(condition);
+
         return {
-          ...p,
-          conditions: current.includes(condition)
+          ...pc,
+          conditions: active
             ? current.filter((c) => c !== condition)
             : [...current, condition],
         };
@@ -213,27 +113,23 @@ export default function App() {
   };
 
   const addEnemy = () => {
-    if (!enemyName || !enemyHp) return;
+    if (!enemyForm.name.trim() || !enemyForm.hp) return;
 
-    setEnemies((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        name: enemyName,
-        hp: Number(enemyHp),
-        maxHp: Number(enemyHp),
-        init: Number(enemyInit || 0),
-      },
-    ]);
+    const enemy = {
+      id: Date.now(),
+      name: enemyForm.name.trim(),
+      hp: Number(enemyForm.hp),
+      maxHp: Number(enemyForm.hp),
+      init: Number(enemyForm.init || 0),
+    };
 
-    pushLog(`Added enemy: ${enemyName}.`);
-    setEnemyName("");
-    setEnemyHp("");
-    setEnemyInit("");
+    setEnemies((prev) => [...prev, enemy]);
+    setEnemyForm({ name: "", hp: "", init: "" });
+    addLog(`Enemy added: ${enemy.name}`);
   };
 
   const updateEnemyHp = (id, amount) => {
-    const target = enemies.find((e) => e.id === id);
+    const enemy = enemies.find((e) => e.id === id);
 
     setEnemies((prev) =>
       prev.map((e) =>
@@ -241,52 +137,51 @@ export default function App() {
       )
     );
 
-    if (target) pushLog(`${target.name} ${amount < 0 ? "takes" : "heals"} ${Math.abs(amount)} HP.`);
+    if (enemy) {
+      addLog(`${enemy.name} ${amount < 0 ? "takes" : "heals"} ${Math.abs(amount)} HP`);
+    }
   };
 
   const removeEnemy = (id) => {
-    const target = enemies.find((e) => e.id === id);
+    const enemy = enemies.find((e) => e.id === id);
     setEnemies((prev) => prev.filter((e) => e.id !== id));
-    if (target) pushLog(`Removed enemy: ${target.name}.`);
+    if (enemy) addLog(`Enemy removed: ${enemy.name}`);
   };
 
-  const loadCultAmbush = () => {
-    setEnemies([
-      { id: Date.now() + 1, name: "Cultist Acolyte", hp: 9, maxHp: 9, init: 12 },
-      { id: Date.now() + 2, name: "Cultist Acolyte", hp: 9, maxHp: 9, init: 10 },
-      { id: Date.now() + 3, name: "Dark Adept", hp: 22, maxHp: 22, init: 14 },
-    ]);
-    setRound(1);
-    setTurnIndex(0);
-    pushLog("Loaded encounter: Cult Ambush.");
+  const addNpc = () => {
+    if (!npcForm.name.trim()) return;
+
+    const npc = {
+      id: Date.now(),
+      ...npcForm,
+      name: npcForm.name.trim(),
+    };
+
+    setNpcs((prev) => [...prev, npc]);
+    setNpcForm({
+      name: "",
+      role: "",
+      faction: "",
+      attitude: "Neutral",
+      notes: "",
+    });
+
+    addLog(`NPC added: ${npc.name}`);
   };
 
-  const loadGnollPatrol = () => {
-    setEnemies([
-      { id: Date.now() + 1, name: "Gnoll", hp: 22, maxHp: 22, init: 13 },
-      { id: Date.now() + 2, name: "Gnoll", hp: 22, maxHp: 22, init: 11 },
-      { id: Date.now() + 3, name: "Gnoll Pack Lord", hp: 49, maxHp: 49, init: 15 },
-    ]);
-    setRound(1);
-    setTurnIndex(0);
-    pushLog("Loaded encounter: Gnoll Patrol.");
-  };
-
-  const loadEarthTempleGuard = () => {
-    setEnemies([
-      { id: Date.now() + 1, name: "Earth Guard", hp: 45, maxHp: 45, init: 10 },
-      { id: Date.now() + 2, name: "Earth Guard", hp: 45, maxHp: 45, init: 9 },
-      { id: Date.now() + 3, name: "Earth Priest", hp: 60, maxHp: 60, init: 12 },
-    ]);
-    setRound(1);
-    setTurnIndex(0);
-    pushLog("Loaded encounter: Earth Temple Guard.");
+  const removeNpc = (id) => {
+    const npc = npcs.find((n) => n.id === id);
+    setNpcs((prev) => prev.filter((n) => n.id !== id));
+    if (npc) addLog(`NPC removed: ${npc.name}`);
   };
 
   const initiative = useMemo(() => {
     const pcs = party.map((p, i) => ({ ...p, id: `pc-${i}`, type: "PC" }));
     const foes = enemies.map((e) => ({ ...e, id: `enemy-${e.id}`, type: "Enemy" }));
-    return [...pcs, ...foes].sort((a, b) => b.init - a.init || a.name.localeCompare(b.name));
+
+    return [...pcs, ...foes].sort(
+      (a, b) => b.init - a.init || a.name.localeCompare(b.name)
+    );
   }, [party, enemies]);
 
   const active = initiative[turnIndex] || null;
@@ -299,155 +194,29 @@ export default function App() {
     if (next >= initiative.length) {
       setTurnIndex(0);
       setRound((r) => r + 1);
-      pushLog(`Round ${round + 1} begins.`);
+      addLog(`Round ${round + 1} begins`);
     } else {
       setTurnIndex(next);
-      pushLog(`Turn advances to ${initiative[next].name}.`);
+      addLog(`Turn advances to ${initiative[next].name}`);
     }
   };
 
   const resetCombat = () => {
     setRound(1);
     setTurnIndex(0);
-    pushLog("Combat reset.");
+    addLog("Combat reset");
   };
 
-  const advanceDay = () => {
-    setCalendar((prev) => ({ ...prev, phase: "Morning" }));
-    setDungeonAlert((v) => clamp(v + 1, 0, 5));
-    setEarthCult((v) => clamp(v + 1, 0, 5));
-    setNodeProgress((v) => clamp(v + 10, 0, 100));
-    pushLog("Advanced one day.");
-  };
+  const loadCultAmbush = () => {
+    setEnemies([
+      { id: Date.now() + 1, name: "Cultist Acolyte", hp: 9, maxHp: 9, init: 12 },
+      { id: Date.now() + 2, name: "Cultist Acolyte", hp: 9, maxHp: 9, init: 10 },
+      { id: Date.now() + 3, name: "Dark Adept", hp: 22, maxHp: 22, init: 14 },
+    ]);
 
-  const buildSessionPrep = () => `## 🕯️ Session Prep
-
-**Date:** ${calendar.date}, ${calendar.phase}  
-**Session:** #${calendar.session}  
-**Dungeon Alert:** ${dungeonAlert}/5  
-**Earth Cult Alert:** ${earthCult}/5  
-**Earth Node Progress:** ${nodeProgress}%  
-
-### Notes
-- Add encounter notes.
-- Add NPC reactions.
-- Add treasure reminders.`;
-
-  const postSessionPrep = () =>
-    postToDiscord("session-prep", sessionPrep || buildSessionPrep());
-
-  const buildSessionSnapshot = () => {
-    const partyText = party.map(p => {
-      const conditions = p.conditions?.length ? ` | ${p.conditions.join(", ")}` : "";
-      return `${p.name}: ${p.hp}/${p.maxHp} HP | AC ${p.ac} | Init ${p.init}${conditions}`;
-    }).join("\n");
-
-    const enemyText = enemies.length
-      ? enemies.map(e => `${e.name}: ${e.hp}/${e.maxHp} HP | Init ${e.init}`).join("\n")
-      : "None";
-
-    const initiativeText = initiative
-      .map((i, idx) => `${idx === turnIndex ? "▶ " : ""}${i.init} — ${i.name} (${i.type})`)
-      .join("\n");
-
-    return `📊 **SESSION SNAPSHOT**
-
-🎯 **Combat**
-Round: ${round}
-Current: ${initiative[turnIndex]?.name || "N/A"}
-
-🧙 **Party**
-${partyText}
-
-👹 **Enemies**
-${enemyText}
-
-⚔️ **Initiative**
-${initiativeText}
-
-🌍 **World State**
-Earth Cult Alert: ${earthCult}/5
-Dungeon Alert: ${dungeonAlert}/5
-Earth Node Progress: ${nodeProgress}%`;
-  };
-
-  const postSessionSnapshot = () => {
-    postToDiscord("dm-control-room", buildSessionSnapshot());
-  };
-
-  const postMissingNotice = () =>
-    postToDiscord(
-      "help-wanted-table",
-      `## 📜 Missing Person Notice — Ganna of Hommlet
-
-**Name:** Ganna, wife of Tarim the Carpenter  
-**Last Seen:** Near the eastern edge of Hommlet at dusk  
-**Description:** Human woman, dark hair, simple village dress  
-**Distinguishing Feature:** Carved wooden pendant  
-**Reward:** Offered upon safe return  
-**Contact:** Tarim, Carpenter of Hommlet`
-    );
-
-  const postCultLog = () =>
-    postToDiscord(
-      "cult-activity-log",
-      `## 👁️ Cult Activity Log
-
-**Earth Cult Alert:** ${earthCult}/5  
-**Dungeon Alert:** ${dungeonAlert}/5  
-**Earth Node Progress:** ${nodeProgress}%`
-    );
-
-  const updateNpc = (id, field, value) => {
-    setNpcs((prev) =>
-      prev.map((npc) => (npc.id === id ? { ...npc, [field]: value } : npc))
-    );
-  };
-
-  const addNpc = () => {
-    if (!npcDraft.name.trim()) {
-      pushLog("NPC name required.");
-      return;
-    }
-
-    const npc = {
-      ...npcDraft,
-      id: Date.now(),
-      name: npcDraft.name.trim(),
-    };
-
-    setNpcs((prev) => [...prev, npc]);
-    setNpcDraft({
-      name: "",
-      location: "Hommlet",
-      faction: "",
-      attitude: "Neutral",
-      status: "Active",
-      lastSeen: "",
-      secret: "",
-    });
-    pushLog(`Added NPC: ${npc.name}.`);
-  };
-
-  const removeNpc = (id) => {
-    const target = npcs.find((npc) => npc.id === id);
-    setNpcs((prev) => prev.filter((npc) => npc.id !== id));
-    if (target) pushLog(`Removed NPC: ${target.name}.`);
-  };
-
-  const buildNpcNote = (npc) => `## 🧑‍🌾 NPC Note — ${npc.name}
-
-**Location:** ${npc.location || "Unknown"}  
-**Faction:** ${npc.faction || "None / Unknown"}  
-**Attitude:** ${npc.attitude || "Neutral"}  
-**Status:** ${npc.status || "Unknown"}  
-**Last Seen:** ${npc.lastSeen || "Unknown"}  
-
-### DM Secret / Note
-${npc.secret || "No secret recorded."}`;
-
-  const postNpcNote = (npc) => {
-    postToDiscord("dm-control-room", buildNpcNote(npc));
+    setRound(1);
+    setTurnIndex(0);
+    addLog("Encounter loaded: Cult Ambush");
   };
 
   const resetSavedState = () => {
@@ -457,433 +226,350 @@ ${npc.secret || "No secret recorded."}`;
 
   return (
     <div style={pageStyle}>
-      <div style={containerStyle}>
-        <h1 style={titleStyle}>Greyhawk Command Console</h1>
+      <h1 style={titleStyle}>Greyhawk Command Console</h1>
 
-        <main style={gridStyle}>
-          <Panel title="Discord Bridge">
-            <input style={inputStyle} value={bridgeUrl} onChange={(e) => setBridgeUrl(e.target.value)} />
-            <input style={inputStyle} value={apiKey} onChange={(e) => setApiKey(e.target.value)} type="password" />
-          </Panel>
+      <main style={gridStyle}>
+        <section style={cardStyle}>
+          <h2 style={headerStyle}>Combat</h2>
+          <p>
+            <strong>Round:</strong> {round}
+          </p>
+          <p>
+            <strong>Current:</strong> {active ? `${active.name} (${active.type})` : "None"}
+          </p>
 
-          <Panel title="Calendar / Time">
-            <div>{calendar.date}</div>
-            <div>{calendar.phase}</div>
-            <button style={buttonStyle} onClick={() => setCalendar((c) => ({ ...c, phase: "Evening" }))}>Evening</button>{" "}
-            <button style={buttonStyle} onClick={advanceDay}>+1 Day</button>
-          </Panel>
+          <button style={buttonStyle} onClick={nextTurn}>Next Turn</button>
+          <button style={buttonStyle} onClick={resetCombat}>Reset Combat</button>
+          <button style={buttonStyle} onClick={loadCultAmbush}>Load Cult Ambush</button>
 
-          <Panel title="Faction / Node">
-            <div>Earth Cult: {earthCult}/5</div>
-            <div>Dungeon: {dungeonAlert}/5</div>
-            <div>Earth Node: {nodeProgress}%</div>
-            <button style={buttonStyle} onClick={() => setEarthCult((v) => clamp(v + 1, 0, 5))}>Cult +</button>{" "}
-            <button style={buttonStyle} onClick={() => setDungeonAlert((v) => clamp(v + 1, 0, 5))}>Dungeon +</button>{" "}
-            <button style={buttonStyle} onClick={() => setNodeProgress((v) => clamp(v + 10, 0, 100))}>Node +</button>
-          </Panel>
-
-          <Panel title="Party Manager" span={2}>
-            <div style={partyGridStyle}>
-              {party.map((p, i) => (
-                <div key={`${p.name}-${i}`} style={partyRowStyle}>
-                  <input style={nameInputStyle} value={p.name} onChange={(e) => updatePartyField(i, "name", e.target.value)} />
-                  <span>HP</span>
-                  <input style={smallInputStyle} value={p.hp} onChange={(e) => updatePartyField(i, "hp", e.target.value)} />
-                  <span>/</span>
-                  <input style={smallInputStyle} value={p.maxHp} onChange={(e) => updatePartyField(i, "maxHp", e.target.value)} />
-                  <span>AC</span>
-                  <input style={smallInputStyle} value={p.ac} onChange={(e) => updatePartyField(i, "ac", e.target.value)} />
-                  <span>Init</span>
-                  <input style={smallInputStyle} value={p.init} onChange={(e) => updatePartyField(i, "init", e.target.value)} />
-                  <button style={smallButtonStyle} onClick={() => updateHp(i, -5)}>-5</button>
-                  <button style={smallButtonStyle} onClick={() => updateHp(i, 5)}>+5</button>
-
-                  <div style={conditionWrapStyle}>
-                    {CONDITIONS.map((c) => {
-                      const isActive = (p.conditions || []).includes(c);
-                      return (
-                        <button
-                          key={c}
-                          style={{
-                            ...conditionButtonStyle,
-                            background: isActive ? "#8a6d1d" : "#252a33",
-                            color: isActive ? "#fff2b8" : "#cbd5e1",
-                          }}
-                          onClick={() => toggleCondition(i, c)}
-                        >
-                          {c}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Panel>
-
-          <Panel title="Combat Tracker" span={2}>
-            <div>Round: {round}</div>
-            <div>Current: {active ? `${active.name} (${active.type})` : "None"}</div>
-            <button style={buttonStyle} onClick={nextTurn}>Next Turn</button>{" "}
-            <button style={buttonStyle} onClick={resetCombat}>Reset</button>
-
-            <div style={initiativeBoxStyle}>
-              {initiative.map((c, i) => (
-                <div
-                  key={`${c.type}-${c.id}`}
-                  style={{
-                    ...initiativeRowStyle,
-                    background: i === turnIndex ? "#4a3415" : "#1d222b",
-                    borderColor: i === turnIndex ? "#d6a03d" : "#303845",
-                  }}
-                >
-                  {i === turnIndex ? "▶ " : ""}
-                  <strong>{c.init}</strong> — {c.name} ({c.type}) — {c.hp}/{c.maxHp}
-                </div>
-              ))}
-            </div>
-          </Panel>
-
-          <Panel title="Enemies">
-            <div style={enemyInputGridStyle}>
-              <input style={inputStyle} placeholder="Name" value={enemyName} onChange={(e) => setEnemyName(e.target.value)} />
-              <input style={inputStyle} placeholder="HP" value={enemyHp} onChange={(e) => setEnemyHp(e.target.value)} />
-              <input style={inputStyle} placeholder="Init" value={enemyInit} onChange={(e) => setEnemyInit(e.target.value)} />
-              <button style={buttonStyle} onClick={addEnemy}>Add</button>
-            </div>
-
-            {enemies.map((e) => (
-              <div key={e.id} style={enemyRowStyle}>
-                <strong>{e.name}</strong> {e.hp}/{e.maxHp} HP Init {e.init}
-                <button style={smallButtonStyle} onClick={() => updateEnemyHp(e.id, -5)}>-5</button>
-                <button style={smallButtonStyle} onClick={() => updateEnemyHp(e.id, 5)}>+5</button>
-                <button style={smallButtonStyle} onClick={() => removeEnemy(e.id)}>Remove</button>
+          <div style={{ marginTop: 10 }}>
+            {initiative.map((actor, i) => (
+              <div
+                key={`${actor.type}-${actor.id}`}
+                style={i === turnIndex ? activeRowStyle : initRowStyle}
+              >
+                {i === turnIndex ? "▶ " : ""}
+                <strong>{actor.init}</strong> — {actor.name} ({actor.type}) — {actor.hp}/{actor.maxHp} HP
               </div>
             ))}
-          </Panel>
+          </div>
+        </section>
 
-          <Panel title="NPC Tracker" span={2}>
-            <div style={npcDraftGridStyle}>
-              <input style={inputStyle} placeholder="NPC name" value={npcDraft.name} onChange={(e) => setNpcDraft({ ...npcDraft, name: e.target.value })} />
-              <input style={inputStyle} placeholder="Location" value={npcDraft.location} onChange={(e) => setNpcDraft({ ...npcDraft, location: e.target.value })} />
-              <input style={inputStyle} placeholder="Faction" value={npcDraft.faction} onChange={(e) => setNpcDraft({ ...npcDraft, faction: e.target.value })} />
-              <select style={inputStyle} value={npcDraft.attitude} onChange={(e) => setNpcDraft({ ...npcDraft, attitude: e.target.value })}>
-                <option>Helpful</option>
-                <option>Friendly</option>
-                <option>Neutral</option>
-                <option>Suspicious</option>
-                <option>Hostile</option>
-              </select>
-              <select style={inputStyle} value={npcDraft.status} onChange={(e) => setNpcDraft({ ...npcDraft, status: e.target.value })}>
-                <option>Active</option>
-                <option>Missing</option>
-                <option>Dead</option>
-                <option>Captured</option>
-                <option>Unknown</option>
-              </select>
-              <input style={inputStyle} placeholder="Last seen" value={npcDraft.lastSeen} onChange={(e) => setNpcDraft({ ...npcDraft, lastSeen: e.target.value })} />
+        <section style={cardStyle}>
+          <h2 style={headerStyle}>Party</h2>
+
+          {party.map((pc, i) => (
+            <div key={pc.name} style={innerCardStyle}>
+              <input
+                style={inputStyle}
+                value={pc.name}
+                onChange={(e) => updatePartyField(i, "name", e.target.value)}
+              />
+
+              <div style={rowStyle}>
+                <span>HP</span>
+                <input
+                  style={smallInputStyle}
+                  value={pc.hp}
+                  onChange={(e) => updatePartyField(i, "hp", e.target.value)}
+                />
+                <span>/</span>
+                <input
+                  style={smallInputStyle}
+                  value={pc.maxHp}
+                  onChange={(e) => updatePartyField(i, "maxHp", e.target.value)}
+                />
+                <span>AC</span>
+                <input
+                  style={smallInputStyle}
+                  value={pc.ac}
+                  onChange={(e) => updatePartyField(i, "ac", e.target.value)}
+                />
+                <span>Init</span>
+                <input
+                  style={smallInputStyle}
+                  value={pc.init}
+                  onChange={(e) => updatePartyField(i, "init", e.target.value)}
+                />
+              </div>
+
+              <button style={smallButtonStyle} onClick={() => updatePartyHp(i, -5)}>-5</button>
+              <button style={smallButtonStyle} onClick={() => updatePartyHp(i, 5)}>+5</button>
+
+              <div style={conditionWrapStyle}>
+                {CONDITIONS.map((condition) => {
+                  const active = pc.conditions.includes(condition);
+                  return (
+                    <button
+                      key={condition}
+                      onClick={() => toggleCondition(i, condition)}
+                      style={{
+                        ...conditionButtonStyle,
+                        background: active ? "#8a6d1d" : "#1f2937",
+                        color: active ? "#fff2b8" : "#e5e7eb",
+                      }}
+                    >
+                      {condition}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+          ))}
+        </section>
 
-            <textarea
-              style={textAreaStyle}
-              placeholder="Secret / DM note"
-              value={npcDraft.secret}
-              onChange={(e) => setNpcDraft({ ...npcDraft, secret: e.target.value })}
-            />
+        <section style={cardStyle}>
+          <h2 style={headerStyle}>Enemies</h2>
 
-            <button style={buttonStyle} onClick={addNpc}>Add NPC</button>
+          <input
+            style={inputStyle}
+            placeholder="Enemy name"
+            value={enemyForm.name}
+            onChange={(e) => setEnemyForm({ ...enemyForm, name: e.target.value })}
+          />
+          <input
+            style={inputStyle}
+            placeholder="HP"
+            value={enemyForm.hp}
+            onChange={(e) => setEnemyForm({ ...enemyForm, hp: e.target.value })}
+          />
+          <input
+            style={inputStyle}
+            placeholder="Initiative"
+            value={enemyForm.init}
+            onChange={(e) => setEnemyForm({ ...enemyForm, init: e.target.value })}
+          />
 
-            <div style={npcListStyle}>
-              {npcs.map((npc) => (
-                <div key={npc.id} style={npcCardStyle}>
-                  <input style={inputStyle} value={npc.name} onChange={(e) => updateNpc(npc.id, "name", e.target.value)} />
-                  <div style={npcMiniGridStyle}>
-                    <input style={inputStyle} value={npc.location} onChange={(e) => updateNpc(npc.id, "location", e.target.value)} />
-                    <input style={inputStyle} value={npc.faction} onChange={(e) => updateNpc(npc.id, "faction", e.target.value)} />
-                    <select style={inputStyle} value={npc.attitude} onChange={(e) => updateNpc(npc.id, "attitude", e.target.value)}>
-                      <option>Helpful</option>
-                      <option>Friendly</option>
-                      <option>Neutral</option>
-                      <option>Suspicious</option>
-                      <option>Hostile</option>
-                    </select>
-                    <select style={inputStyle} value={npc.status} onChange={(e) => updateNpc(npc.id, "status", e.target.value)}>
-                      <option>Active</option>
-                      <option>Missing</option>
-                      <option>Dead</option>
-                      <option>Captured</option>
-                      <option>Unknown</option>
-                    </select>
-                  </div>
-                  <input style={inputStyle} value={npc.lastSeen} onChange={(e) => updateNpc(npc.id, "lastSeen", e.target.value)} />
-                  <textarea style={textAreaStyle} value={npc.secret} onChange={(e) => updateNpc(npc.id, "secret", e.target.value)} />
-                  <button style={buttonStyle} onClick={() => postNpcNote(npc)}>Post NPC Note</button>{" "}
-                  <button style={dangerButtonStyle} onClick={() => removeNpc(npc.id)}>Remove</button>
-                </div>
-              ))}
+          <button style={buttonStyle} onClick={addEnemy}>Add Enemy</button>
+
+          {enemies.map((enemy) => (
+            <div key={enemy.id} style={innerCardStyle}>
+              <strong>{enemy.name}</strong>
+              <div>{enemy.hp}/{enemy.maxHp} HP | Init {enemy.init}</div>
+              <button style={smallButtonStyle} onClick={() => updateEnemyHp(enemy.id, -5)}>-5</button>
+              <button style={smallButtonStyle} onClick={() => updateEnemyHp(enemy.id, 5)}>+5</button>
+              <button style={dangerButtonStyle} onClick={() => removeEnemy(enemy.id)}>Remove</button>
             </div>
-          </Panel>
+          ))}
+        </section>
 
-          <Panel title="Encounter Presets">
-            <button style={buttonStyle} onClick={loadCultAmbush}>Cult Ambush</button>{" "}
-            <button style={buttonStyle} onClick={loadGnollPatrol}>Gnoll Patrol</button>{" "}
-            <button style={buttonStyle} onClick={loadEarthTempleGuard}>Earth Temple Guard</button>
-          </Panel>
+        <section style={cardStyle}>
+          <h2 style={headerStyle}>NPC Tracker</h2>
 
-          <Panel title="Session Prep">
-            <button style={buttonStyle} onClick={() => setSessionPrep(buildSessionPrep())}>Auto Fill</button>{" "}
-            <button style={buttonStyle} onClick={postSessionPrep}>Post</button>
-            <textarea style={textAreaStyle} value={sessionPrep} onChange={(e) => setSessionPrep(e.target.value)} />
-          </Panel>
+          <input
+            style={inputStyle}
+            placeholder="NPC name"
+            value={npcForm.name}
+            onChange={(e) => setNpcForm({ ...npcForm, name: e.target.value })}
+          />
+          <input
+            style={inputStyle}
+            placeholder="Role"
+            value={npcForm.role}
+            onChange={(e) => setNpcForm({ ...npcForm, role: e.target.value })}
+          />
+          <input
+            style={inputStyle}
+            placeholder="Faction"
+            value={npcForm.faction}
+            onChange={(e) => setNpcForm({ ...npcForm, faction: e.target.value })}
+          />
 
-          <Panel title="Post to Channel">
-            <select style={inputStyle} value={channel} onChange={(e) => setChannel(e.target.value)}>
-              <option value="bard-tales">#bard-tales</option>
-              <option value="session-prep">#session-prep</option>
-              <option value="dm-control-room">#dm-control-room</option>
-              <option value="cult-activity-log">#cult-activity-log</option>
-              <option value="help-wanted-table">#help-wanted-table</option>
-            </select>
-            <textarea style={textAreaStyle} value={customMsg} onChange={(e) => setCustomMsg(e.target.value)} />
-            <button
-              style={buttonStyle}
-              onClick={() => {
-                if (!customMsg.trim()) return;
-                postToDiscord(channel, customMsg);
-                setCustomMsg("");
-              }}
-            >
-              Post Message
-            </button>
-          </Panel>
+          <select
+            style={inputStyle}
+            value={npcForm.attitude}
+            onChange={(e) => setNpcForm({ ...npcForm, attitude: e.target.value })}
+          >
+            <option>Friendly</option>
+            <option>Neutral</option>
+            <option>Suspicious</option>
+            <option>Hostile</option>
+          </select>
 
-          <Panel title="DM Actions">
-            <button style={buttonStyle} onClick={postMissingNotice}>Missing Person Notice</button>{" "}
-            <button style={buttonStyle} onClick={postCultLog}>Post Cult Log</button>{" "}
-            <button style={buttonStyle} onClick={postSessionSnapshot}>📊 Snapshot</button>{" "}
-            <button style={dangerButtonStyle} onClick={resetSavedState}>Reset Saved State</button>
-          </Panel>
+          <textarea
+            style={textAreaStyle}
+            placeholder="Notes"
+            value={npcForm.notes}
+            onChange={(e) => setNpcForm({ ...npcForm, notes: e.target.value })}
+          />
 
-          <Panel title="Log" span={2}>
-            <div style={logBoxStyle}>
-              {log.length === 0 ? <p>No actions yet.</p> : log.map((l, i) => <div key={i}>• {l}</div>)}
+          <button style={buttonStyle} onClick={addNpc}>Add NPC</button>
+
+          {npcs.map((npc) => (
+            <div key={npc.id} style={innerCardStyle}>
+              <strong>{npc.name}</strong>
+              <div>{npc.role || "Unknown role"} | {npc.faction || "No faction"}</div>
+              <div><em>{npc.attitude}</em></div>
+              <p>{npc.notes}</p>
+              <button style={dangerButtonStyle} onClick={() => removeNpc(npc.id)}>Remove</button>
             </div>
-          </Panel>
-        </main>
-      </div>
+          ))}
+        </section>
+
+        <section style={cardStyle}>
+          <h2 style={headerStyle}>Log</h2>
+          <button style={dangerButtonStyle} onClick={resetSavedState}>Reset Saved State</button>
+          <div style={logBoxStyle}>
+            {log.length === 0 ? (
+              <p>No actions yet.</p>
+            ) : (
+              log.map((entry, i) => <div key={i}>• {entry}</div>)
+            )}
+          </div>
+        </section>
+      </main>
     </div>
   );
 }
 
-function Panel({ title, children, span = 1 }) {
-  return (
-    <section
-      style={{
-        ...panelStyle,
-        gridColumn: `span ${span}`,
-      }}
-    >
-      <h2 style={panelTitleStyle}>{title}</h2>
-      {children}
-    </section>
-  );
-}
-
 const pageStyle = {
-  width: "100%",
   minHeight: "100vh",
+  width: "100%",
+  overflowX: "hidden",
   background: "radial-gradient(circle at top,#202733,#0b0f14)",
   color: "#e5e7eb",
   fontFamily: "Georgia, 'Times New Roman', serif",
-  overflowX: "hidden",
-  boxSizing: "border-box",
-};
-
-const containerStyle = {
-  width: "100%",
   padding: 12,
   boxSizing: "border-box",
 };
 
 const titleStyle = {
-  color: "#f2d28b",
   textAlign: "center",
-  fontSize: 34,
+  color: "#f2d28b",
   margin: "8px 0 14px",
 };
 
 const gridStyle = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
   gap: 12,
   width: "100%",
   boxSizing: "border-box",
 };
 
-const panelStyle = {
+const cardStyle = {
   background: "#0d1117",
   border: "1px solid #3b4351",
   borderRadius: 8,
   padding: 10,
-  minWidth: 0,
   boxSizing: "border-box",
-  boxShadow: "0 4px 14px rgba(0,0,0,0.35)",
+  minWidth: 0,
 };
 
-const panelTitleStyle = {
+const innerCardStyle = {
+  background: "#121821",
+  border: "1px solid #303845",
+  borderRadius: 6,
+  padding: 8,
+  marginBottom: 8,
+};
+
+const headerStyle = {
   color: "#f2d28b",
-  fontSize: 17,
-  margin: "0 0 8px",
+  marginTop: 0,
   borderBottom: "1px solid #35291a",
   paddingBottom: 4,
-  textTransform: "uppercase",
+};
+
+const rowStyle = {
+  display: "flex",
+  gap: 6,
+  alignItems: "center",
+  flexWrap: "wrap",
+  marginBottom: 6,
 };
 
 const inputStyle = {
   width: "100%",
-  padding: 6,
-  marginBottom: 6,
+  padding: 9,
+  marginBottom: 8,
   background: "#111827",
   color: "#e5e7eb",
   border: "1px solid #3b4351",
-  borderRadius: 4,
+  borderRadius: 6,
   boxSizing: "border-box",
-};
-
-const nameInputStyle = {
-  ...inputStyle,
-  width: 110,
-  marginBottom: 0,
+  fontSize: 14,
+  minHeight: 38,
 };
 
 const smallInputStyle = {
-  ...inputStyle,
-  width: 48,
-  marginBottom: 0,
+  width: 54,
+  padding: 7,
+  background: "#111827",
+  color: "#e5e7eb",
+  border: "1px solid #3b4351",
+  borderRadius: 6,
 };
 
 const buttonStyle = {
   background: "linear-gradient(180deg, #4b5563 0%, #252b34 100%)",
   color: "#f8fafc",
   border: "1px solid #6b7280",
-  borderRadius: 4,
-  padding: "4px 8px",
+  borderRadius: 6,
+  padding: "9px 12px",
   cursor: "pointer",
-  margin: 2,
+  margin: 4,
+  fontSize: 14,
+  minHeight: 38,
 };
 
 const smallButtonStyle = {
   ...buttonStyle,
-  padding: "2px 6px",
-  fontSize: 12,
+  padding: "6px 9px",
+  fontSize: 13,
+  minHeight: 34,
 };
 
 const dangerButtonStyle = {
-  ...buttonStyle,
+  ...smallButtonStyle,
   background: "linear-gradient(180deg, #7f1d1d 0%, #3f1111 100%)",
   border: "1px solid #b91c1c",
-};
-
-const partyGridStyle = {
-  display: "grid",
-  gap: 8,
-};
-
-const partyRowStyle = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: 6,
-  alignItems: "center",
-  padding: 8,
-  background: "#121821",
-  border: "1px solid #303845",
-  borderRadius: 6,
 };
 
 const conditionWrapStyle = {
   display: "flex",
   flexWrap: "wrap",
   gap: 4,
-  width: "100%",
+  marginTop: 6,
 };
 
 const conditionButtonStyle = {
   border: "1px solid #3b4351",
   borderRadius: 4,
-  padding: "2px 5px",
+  padding: "4px 6px",
   fontSize: 11,
-  cursor: "pointer",
 };
 
-const initiativeBoxStyle = {
-  marginTop: 10,
-  maxHeight: 260,
-  overflowY: "auto",
-};
-
-const initiativeRowStyle = {
-  padding: 7,
-  marginBottom: 5,
-  border: "1px solid",
-  borderRadius: 5,
-};
-
-const enemyInputGridStyle = {
-  display: "grid",
-  gridTemplateColumns: "1fr 70px 70px 60px",
-  gap: 6,
-};
-
-const enemyRowStyle = {
-  padding: 6,
-  borderBottom: "1px solid #303845",
-  display: "flex",
-  flexWrap: "wrap",
-  gap: 6,
-  alignItems: "center",
-};
-
-const npcDraftGridStyle = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-  gap: 6,
-};
-
-const npcListStyle = {
-  display: "grid",
-  gap: 8,
-  marginTop: 10,
-  maxHeight: 420,
-  overflowY: "auto",
-};
-
-const npcCardStyle = {
-  background: "#121821",
+const initRowStyle = {
+  padding: 10,
+  marginBottom: 6,
   border: "1px solid #303845",
   borderRadius: 6,
-  padding: 8,
+  fontSize: 16,
+  background: "#1d222b",
 };
 
-const npcMiniGridStyle = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
-  gap: 6,
+const activeRowStyle = {
+  ...initRowStyle,
+  background: "#4a3415",
+  border: "1px solid #d6a03d",
 };
 
 const textAreaStyle = {
   width: "100%",
-  minHeight: 110,
-  padding: 8,
-  marginTop: 6,
+  minHeight: 120,
+  padding: 10,
+  marginBottom: 8,
   background: "#111827",
   color: "#e5e7eb",
   border: "1px solid #3b4351",
-  borderRadius: 4,
+  borderRadius: 6,
   boxSizing: "border-box",
+  fontSize: 14,
 };
 
 const logBoxStyle = {
-  maxHeight: 180,
+  maxHeight: 250,
   overflowY: "auto",
   fontSize: 13,
 };
