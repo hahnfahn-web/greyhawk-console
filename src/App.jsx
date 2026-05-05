@@ -300,12 +300,20 @@ Earth Node Progress: ${nodeProgress}%`;
 
   const layoutStyle = isMobile ? mobileGridStyle : desktopGridStyle;
 
+const leftStyle = isMobile ? mobileSectionStyle : leftColumnStyle;
+const topStyle = isMobile ? mobileSectionStyle : topBarStyle;
+const centerStyle = isMobile ? mobileSectionStyle : centerColumnStyle;
+const rightStyle = isMobile ? mobileSectionStyle : rightColumnStyle;
+const bottomStyle = isMobile ? mobileSectionStyle : bottomBarStyle;
+
   return (
     <div style={pageStyle}>
-      <h1 style={titleStyle}>Greyhawk Command Console v2</h1>
+      <h1 style={isMobile ? mobileTitleStyle : titleStyle}>
+  Greyhawk Command Console v2
+</h1>
 
       <main style={layoutStyle}>
-        <div style={leftColumnStyle}>
+        <div style={leftStyle}>
           <PartyPanel
             party={party}
             updatePartyField={updatePartyField}
@@ -321,7 +329,7 @@ Earth Node Progress: ${nodeProgress}%`;
           />
         </div>
 
-        <div style={topBarStyle}>
+        <div style={topStyle}>
           <Panel title="Discord Bridge">
             <input style={inputStyle} value={bridgeUrl} onChange={(e) => setBridgeUrl(e.target.value)} />
             <input style={inputStyle} type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
@@ -344,7 +352,7 @@ Earth Node Progress: ${nodeProgress}%`;
           </Panel>
         </div>
 
-        <div style={centerColumnStyle}>
+        <div style={centerStyle}>
           <CombatPanel
             round={round}
             active={active}
@@ -356,7 +364,7 @@ Earth Node Progress: ${nodeProgress}%`;
           />
         </div>
 
-        <div style={rightColumnStyle}>
+        <div style={rightStyle}>
           <EnemiesPanel
             enemies={enemies}
             enemyForm={enemyForm}
@@ -390,7 +398,7 @@ Earth Node Progress: ${nodeProgress}%`;
           </Panel>
         </div>
 
-        <div style={bottomBarStyle}>
+        <div style={bottomStyle}>
           <Panel title="Log">
             <div style={logBoxStyle}>
               {log.length === 0 ? <p>No actions yet.</p> : log.map((l, i) => <div key={i}>• {l}</div>)}
@@ -558,6 +566,21 @@ const mobileGridStyle = {
   display: "grid",
   gridTemplateColumns: "1fr",
   gap: 12,
+};
+
+const mobileSectionStyle = {
+  display: "grid",
+  gap: 12,
+  alignContent: "start",
+  minWidth: 0,
+};
+
+const mobileTitleStyle = {
+  textAlign: "center",
+  color: "#f2d28b",
+  margin: "8px 0 14px",
+  fontSize: 36,
+  lineHeight: 1,
 };
 
 const leftColumnStyle = {
