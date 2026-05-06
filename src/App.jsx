@@ -69,7 +69,12 @@ export default function App() {
   const [customMsg, setCustomMsg] = useState("");
 
   const [calendar, setCalendar] = useState(() =>
-    loadSaved("calendar", { date: "6 Sunsebb, 576 CY", phase: "Morning", session: 39 })
+    loadSaved("calendar", {
+  date: "6 Sunsebb, 576 CY",
+  phase: "Morning",
+  time: "8:00 AM",
+  session: 39,
+})
   );
 
   const [earthCult, setEarthCult] = useState(() => loadSaved("earthCult", 3));
@@ -417,11 +422,142 @@ Earth Node Progress: ${nodeProgress}%`;
           </Panel>
 
           <Panel title="Calendar / Time">
-            <div>{calendar.date}</div>
-            <div>{calendar.phase}</div>
-            <button style={buttonStyle} onClick={() => setCalendar((c) => ({ ...c, phase: "Evening" }))}>Evening</button>
-            <button style={buttonStyle} onClick={() => setCalendar((c) => ({ ...c, phase: "Morning" }))}>Morning</button>
-          </Panel>
+  <div style={{ fontSize: 20, marginBottom: 6 }}>
+    {calendar.date}
+  </div>
+
+  <div style={{ fontSize: 18, color: "#f2d28b", marginBottom: 6 }}>
+    {calendar.phase}
+  </div>
+
+  <div style={{ fontSize: 16, marginBottom: 12 }}>
+    🕒 {calendar.time || "8:00 AM"}
+  </div>
+
+  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+    <button
+      style={buttonStyle}
+      onClick={() =>
+        setCalendar((c) => ({
+          ...c,
+          phase: "Morning",
+          time: "8:00 AM",
+        }))
+      }
+    >
+      Morning
+    </button>
+
+    <button
+      style={buttonStyle}
+      onClick={() =>
+        setCalendar((c) => ({
+          ...c,
+          phase: "Afternoon",
+          time: "1:00 PM",
+        }))
+      }
+    >
+      Afternoon
+    </button>
+
+    <button
+      style={buttonStyle}
+      onClick={() =>
+        setCalendar((c) => ({
+          ...c,
+          phase: "Evening",
+          time: "6:00 PM",
+        }))
+      }
+    >
+      Evening
+    </button>
+
+    <button
+      style={buttonStyle}
+      onClick={() =>
+        setCalendar((c) => ({
+          ...c,
+          phase: "Night",
+          time: "11:00 PM",
+        }))
+      }
+    >
+      Night
+    </button>
+  </div>
+
+  <div style={{ marginTop: 10 }}>
+    <button
+      style={smallButtonStyle}
+      onClick={() => {
+        const times = [
+          "8:00 AM",
+          "9:00 AM",
+          "10:00 AM",
+          "11:00 AM",
+          "12:00 PM",
+          "1:00 PM",
+          "2:00 PM",
+          "3:00 PM",
+          "4:00 PM",
+          "5:00 PM",
+          "6:00 PM",
+          "7:00 PM",
+          "8:00 PM",
+          "9:00 PM",
+          "10:00 PM",
+          "11:00 PM",
+        ];
+
+        const current = times.indexOf(calendar.time || "8:00 AM");
+        const next = (current + 1) % times.length;
+
+        setCalendar((c) => ({
+          ...c,
+          time: times[next],
+        }));
+      }}
+    >
+      +1 Hour
+    </button>
+
+    <button
+      style={smallButtonStyle}
+      onClick={() => {
+        const times = [
+          "8:00 AM",
+          "9:00 AM",
+          "10:00 AM",
+          "11:00 AM",
+          "12:00 PM",
+          "1:00 PM",
+          "2:00 PM",
+          "3:00 PM",
+          "4:00 PM",
+          "5:00 PM",
+          "6:00 PM",
+          "7:00 PM",
+          "8:00 PM",
+          "9:00 PM",
+          "10:00 PM",
+          "11:00 PM",
+        ];
+
+        const current = times.indexOf(calendar.time || "8:00 AM");
+        const next = (current + 4) % times.length;
+
+        setCalendar((c) => ({
+          ...c,
+          time: times[next],
+        }));
+      }}
+    >
+      +4 Hours
+    </button>
+  </div>
+</Panel>
 
           <Panel title="Faction / Node">
             <div>Earth Cult: {earthCult}/5</div>
@@ -508,6 +644,30 @@ function Panel({ title, children }) {
     </section>
   );
 }
+
+<Panel title="Fantasy Calendar">
+  <div style={{ marginBottom: 10 }}>
+    Greyhawk Campaign Calendar
+  </div>
+
+  <a
+    href="https://app.fantasy-calendar.com/calendars/448b4c997c5b2eacf40f46c3fc43fdba"
+    target="_blank"
+    rel="noreferrer"
+    style={{
+      display: "inline-block",
+      textDecoration: "none",
+      color: "#fff",
+      background: "linear-gradient(180deg, #4b5563 0%, #252b34 100%)",
+      border: "1px solid #6b7280",
+      borderRadius: 6,
+      padding: "10px 14px",
+      fontWeight: "bold",
+    }}
+  >
+    Open Fantasy Calendar
+  </a>
+</Panel>
 
 function CombatPanel({ round, active, initiative, turnIndex, nextTurn, resetCombat, loadCultAmbush }) {
   return (
