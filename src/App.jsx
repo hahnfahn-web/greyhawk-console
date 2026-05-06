@@ -59,6 +59,25 @@ function useIsMobile() {
   return isMobile;
 }
 
+function getPhase(hour) {
+  if (hour >= 6 && hour <= 11) return "Morning";
+  if (hour >= 12 && hour <= 16) return "Afternoon";
+  if (hour >= 17 && hour <= 20) return "Evening";
+  return "Night";
+}
+
+function formatHour(hour) {
+  const suffix = hour >= 12 ? "PM" : "AM";
+  const normalized = hour % 12 || 12;
+  return `${normalized}:00 ${suffix}`;
+}
+
+function nextMoonPhase(current) {
+  const phases = ["New Moon", "Waxing", "Full Moon", "Waning"];
+  const idx = phases.indexOf(current);
+  return phases[(idx + 1) % phases.length];
+}
+
 export default function App() {
   const isMobile = useIsMobile();
 
@@ -70,11 +89,16 @@ export default function App() {
 
   const [calendar, setCalendar] = useState(() =>
     loadSaved("calendar", {
-  date: "6 Sunsebb, 576 CY",
-  phase: "Morning",
-  time: "8:00 AM",
-  session: 39,
-})
+      date: "6 Sunsebb, 576 CY",
+      phase: "Morning",
+      time: 8,
+      day: 6,
+      month: "Sunsebb",
+      year: 576,
+      dungeonTurn: 0,
+      moonPhase: "Waxing",
+      session: 39,
+    })
   );
 
   const [earthCult, setEarthCult] = useState(() => loadSaved("earthCult", 3));
@@ -332,7 +356,9 @@ export default function App() {
 
   const buildPrep = () => `## 🕯️ Session Prep
 
-**Date:** ${calendar.date}, ${calendar.phase}
+**Date:** ${calendar.date}, ${calendar.phase}, ${formatHour(calendar.time)}
+**Dungeon Turn:** ${calendar.dungeonTurn}
+**Moon Phase:** ${calendar.moonPhase}
 **Session:** #${calendar.session}
 **Earth Cult Alert:** ${earthCult}/5
 **Dungeon Alert:** ${dungeonAlert}/5
@@ -380,6 +406,42 @@ Dungeon Alert: ${dungeonAlert}/5
 Earth Node Progress: ${nodeProgress}%`;
   };
 
+  const advanceTime = (hours = 0, minutes = 0) => {
+    setCalendar((prev) => {
+      let newHour = typeof prev.time === "number" ? prev.time : 8;
+      let newTurn = prev.dungeonTurn || 0;
+
+      if (minutes >= 10) {
+        newTurn += Math.floor(minutes / 10);
+      }
+
+      newHour += hours;
+
+      let newDay = prev.day || 6;
+      let newMoon = prev.moonPhase || "Waxing";
+
+      while (newHour >= 24) {
+        newHour -= 24;
+        newDay += 1;
+        newMoon = nextMoonPhase(newMoon);
+        addLog("🌙 A new day dawns over Greyhawk.");
+      }
+
+      const phase = getPhase(newHour);
+      addLog(`🕒 Time advances to ${formatHour(newHour)} (${phase}).`);
+
+      return {
+        ...prev,
+        day: newDay,
+        time: newHour,
+        phase,
+        dungeonTurn: newTurn,
+        moonPhase: newMoon,
+        date: `${newDay} ${prev.month || "Sunsebb"}, ${prev.year || 576} CY`,
+      };
+    });
+  };
+
   const resetSavedState = () => {
     localStorage.clear();
     window.location.reload();
@@ -421,143 +483,42 @@ Earth Node Progress: ${nodeProgress}%`;
             <input style={inputStyle} type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
           </Panel>
 
-          <Panel title="Calendar / Time">
-  <div style={{ fontSize: 20, marginBottom: 6 }}>
-    {calendar.date}
-  </div>
+          <Panel title="World Clock">
+            <div style={{ fontSize: 20, marginBottom: 6 }}>
+              📅 {calendar.date}
+            </div>
 
-  <div style={{ fontSize: 18, color: "#f2d28b", marginBottom: 6 }}>
-    {calendar.phase}
-  </div>
+            <div style={{ fontSize: 18, color: "#f2d28b", marginBottom: 6 }}>
+              ☀️ {calendar.phase}
+            </div>
 
-  <div style={{ fontSize: 16, marginBottom: 12 }}>
-    🕒 {calendar.time || "8:00 AM"}
-  </div>
+            <div style={{ fontSize: 18, marginBottom: 6 }}>
+              🕒 {formatHour(typeof calendar.time === "number" ? calendar.time : 8)}
+            </div>
 
-  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-    <button
-      style={buttonStyle}
-      onClick={() =>
-        setCalendar((c) => ({
-          ...c,
-          phase: "Morning",
-          time: "8:00 AM",
-        }))
-      }
-    >
-      Morning
-    </button>
+            <div style={{ marginBottom: 6 }}>
+              🌙 Moon: {calendar.moonPhase || "Waxing"}
+            </div>
 
-    <button
-      style={buttonStyle}
-      onClick={() =>
-        setCalendar((c) => ({
-          ...c,
-          phase: "Afternoon",
-          time: "1:00 PM",
-        }))
-      }
-    >
-      Afternoon
-    </button>
+            <div style={{ marginBottom: 12 }}>
+              🏰 Dungeon Turn: {calendar.dungeonTurn || 0}
+            </div>
 
-    <button
-      style={buttonStyle}
-      onClick={() =>
-        setCalendar((c) => ({
-          ...c,
-          phase: "Evening",
-          time: "6:00 PM",
-        }))
-      }
-    >
-      Evening
-    </button>
-
-    <button
-      style={buttonStyle}
-      onClick={() =>
-        setCalendar((c) => ({
-          ...c,
-          phase: "Night",
-          time: "11:00 PM",
-        }))
-      }
-    >
-      Night
-    </button>
-  </div>
-
-  <div style={{ marginTop: 10 }}>
-    <button
-      style={smallButtonStyle}
-      onClick={() => {
-        const times = [
-          "8:00 AM",
-          "9:00 AM",
-          "10:00 AM",
-          "11:00 AM",
-          "12:00 PM",
-          "1:00 PM",
-          "2:00 PM",
-          "3:00 PM",
-          "4:00 PM",
-          "5:00 PM",
-          "6:00 PM",
-          "7:00 PM",
-          "8:00 PM",
-          "9:00 PM",
-          "10:00 PM",
-          "11:00 PM",
-        ];
-
-        const current = times.indexOf(calendar.time || "8:00 AM");
-        const next = (current + 1) % times.length;
-
-        setCalendar((c) => ({
-          ...c,
-          time: times[next],
-        }));
-      }}
-    >
-      +1 Hour
-    </button>
-
-    <button
-      style={smallButtonStyle}
-      onClick={() => {
-        const times = [
-          "8:00 AM",
-          "9:00 AM",
-          "10:00 AM",
-          "11:00 AM",
-          "12:00 PM",
-          "1:00 PM",
-          "2:00 PM",
-          "3:00 PM",
-          "4:00 PM",
-          "5:00 PM",
-          "6:00 PM",
-          "7:00 PM",
-          "8:00 PM",
-          "9:00 PM",
-          "10:00 PM",
-          "11:00 PM",
-        ];
-
-        const current = times.indexOf(calendar.time || "8:00 AM");
-        const next = (current + 4) % times.length;
-
-        setCalendar((c) => ({
-          ...c,
-          time: times[next],
-        }));
-      }}
-    >
-      +4 Hours
-    </button>
-  </div>
-</Panel>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              <button style={smallButtonStyle} onClick={() => advanceTime(0, 10)}>
+                +10 Min
+              </button>
+              <button style={smallButtonStyle} onClick={() => advanceTime(1, 0)}>
+                +1 Hour
+              </button>
+              <button style={smallButtonStyle} onClick={() => advanceTime(4, 0)}>
+                +4 Hours
+              </button>
+              <button style={smallButtonStyle} onClick={() => advanceTime(24, 0)}>
+                Next Day
+              </button>
+            </div>
+          </Panel>
 
           <Panel title="Faction / Node">
             <div>Earth Cult: {earthCult}/5</div>
