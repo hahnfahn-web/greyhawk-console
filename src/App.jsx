@@ -567,6 +567,21 @@ Earth Node Progress: ${nodeProgress}%`;
             <button style={smallButtonStyle} onClick={() => setDungeonAlert((v) => clamp(v + 1, 0, 5))}>Dungeon +</button>
             <button style={smallButtonStyle} onClick={() => setNodeProgress((v) => clamp(v + 10, 0, 100))}>Node +</button>
           </Panel>
+
+<Panel title="Fantasy Calendar">
+  <div style={{ marginBottom: 10 }}>
+    Greyhawk Campaign Calendar
+  </div>
+
+  <a
+    href="https://app.fantasy-calendar.com/calendars/448b4c997c5b2eacf40f46c3fc43fdba"
+    target="_blank"
+    rel="noreferrer"
+    style={linkButtonStyle}
+  >
+    Open Fantasy Calendar
+  </a>
+</Panel>
         </div>
 
         <div style={centerStyle}>
@@ -645,29 +660,7 @@ function Panel({ title, children }) {
   );
 }
 
-<Panel title="Fantasy Calendar">
-  <div style={{ marginBottom: 10 }}>
-    Greyhawk Campaign Calendar
-  </div>
 
-  <a
-    href="https://app.fantasy-calendar.com/calendars/448b4c997c5b2eacf40f46c3fc43fdba"
-    target="_blank"
-    rel="noreferrer"
-    style={{
-      display: "inline-block",
-      textDecoration: "none",
-      color: "#fff",
-      background: "linear-gradient(180deg, #4b5563 0%, #252b34 100%)",
-      border: "1px solid #6b7280",
-      borderRadius: 6,
-      padding: "10px 14px",
-      fontWeight: "bold",
-    }}
-  >
-    Open Fantasy Calendar
-  </a>
-</Panel>
 
 function CombatPanel({ round, active, initiative, turnIndex, nextTurn, resetCombat, loadCultAmbush }) {
   return (
@@ -1076,4 +1069,15 @@ const logBoxStyle = {
   maxHeight: 135,
   overflowY: "auto",
   fontSize: 13,
+};
+
+const linkButtonStyle = {
+  display: "inline-block",
+  textDecoration: "none",
+  color: "#fff",
+  background: "linear-gradient(180deg, #4b5563 0%, #252b34 100%)",
+  border: "1px solid #6b7280",
+  borderRadius: 6,
+  padding: "10px 14px",
+  fontWeight: "bold",
 };
