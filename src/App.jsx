@@ -8,6 +8,33 @@ const CONDITIONS = [
   "Restrained", "Stunned", "Invisible", "Concentrating", "Unconscious",
 ];
 
+const DEFAULT_ENCOUNTERS = [
+  {
+    name: "Cult Ambush",
+    enemies: [
+      { name: "Cultist Acolyte", hp: 9, maxHp: 9, init: 12 },
+      { name: "Cultist Acolyte", hp: 9, maxHp: 9, init: 10 },
+      { name: "Dark Adept", hp: 22, maxHp: 22, init: 14 },
+    ],
+  },
+  {
+    name: "Gnoll Patrol",
+    enemies: [
+      { name: "Gnoll", hp: 22, maxHp: 22, init: 13 },
+      { name: "Gnoll", hp: 22, maxHp: 22, init: 11 },
+      { name: "Gnoll Pack Lord", hp: 49, maxHp: 49, init: 15 },
+    ],
+  },
+  {
+    name: "Earth Temple Guard",
+    enemies: [
+      { name: "Earth Guard", hp: 45, maxHp: 45, init: 10 },
+      { name: "Earth Guard", hp: 45, maxHp: 45, init: 9 },
+      { name: "Earth Priest", hp: 60, maxHp: 60, init: 12 },
+    ],
+  },
+];
+
 function clamp(v, min, max) {
   return Math.max(min, Math.min(max, v));
 }
@@ -23,14 +50,12 @@ function loadSaved(key, fallback) {
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false);
-
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 900);
     check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
-
   return isMobile;
 }
 
@@ -77,6 +102,10 @@ export default function App() {
   });
 
   const [sessionPrep, setSessionPrep] = useState(() => loadSaved("sessionPrep", ""));
+  const [savedEncounters, setSavedEncounters] = useState(() =>
+    loadSaved("savedEncounters", DEFAULT_ENCOUNTERS)
+  );
+  const [encounterName, setEncounterName] = useState("");
 
   useEffect(() => localStorage.setItem("log", JSON.stringify(log)), [log]);
   useEffect(() => localStorage.setItem("bridgeUrl", JSON.stringify(bridgeUrl)), [bridgeUrl]);
@@ -92,6 +121,7 @@ export default function App() {
   useEffect(() => localStorage.setItem("turnIndex", JSON.stringify(turnIndex)), [turnIndex]);
   useEffect(() => localStorage.setItem("npcs", JSON.stringify(npcs)), [npcs]);
   useEffect(() => localStorage.setItem("sessionPrep", JSON.stringify(sessionPrep)), [sessionPrep]);
+  useEffect(() => localStorage.setItem("savedEncounters", JSON.stringify(savedEncounters)), [savedEncounters]);
 
   const addLog = (msg) =>
     setLog((prev) => [`${new Date().toLocaleTimeString()} — ${msg}`, ...prev].slice(0, 50));
@@ -101,12 +131,10 @@ export default function App() {
       addLog("❌ Bridge not configured.");
       return;
     }
-
     if (!message?.trim()) {
       addLog("❌ Nothing to post.");
       return;
     }
-
     try {
       const res = await fetch(`${bridgeUrl}/discord/post`, {
         method: "POST",
@@ -116,7 +144,6 @@ export default function App() {
         },
         body: JSON.stringify({ channel: target, message }),
       });
-
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       addLog(`✅ Posted to #${target}.`);
     } catch (err) {
@@ -161,7 +188,6 @@ export default function App() {
 
   const addEnemy = () => {
     if (!enemyForm.name.trim() || !enemyForm.hp) return;
-
     const enemy = {
       id: Date.now(),
       name: enemyForm.name.trim(),
@@ -169,20 +195,29 @@ export default function App() {
       maxHp: Number(enemyForm.hp),
       init: Number(enemyForm.init || 0),
     };
-
     setEnemies((prev) => [...prev, enemy]);
     setEnemyForm({ name: "", hp: "", init: "" });
     addLog(`Enemy added: ${enemy.name}.`);
   };
 
   const updateEnemyHp = (id, amount) => {
-    const enemy = enemies.find((e) => e.id === id);
-    setEnemies((prev) =>
-      prev.map((e) =>
-        e.id === id ? { ...e, hp: clamp(e.hp + amount, 0, e.maxHp) } : e
-      )
-    );
-    if (enemy) addLog(`${enemy.name} ${amount < 0 ? "takes" : "heals"} ${Math.abs(amount)} HP.`);
+    setEnemies((prev) => {
+      return prev.flatMap((e) => {
+        if (e.id !== id) return [e];
+        const newHp = clamp(e.hp + amount, 0, e.maxHp);
+
+        if (newHp <= 0) {
+          addLog(`☠️ ${e.name} has fallen.`);
+          return [];
+        }
+
+        if (newHp <= Math.floor(e.maxHp / 2) && e.hp > Math.floor(e.maxHp / 2)) {
+          addLog(`🩸 ${e.name} is bloodied.`);
+        }
+
+        return [{ ...e, hp: newHp }];
+      });
+    });
   };
 
   const removeEnemy = (id) => {
@@ -203,6 +238,60 @@ export default function App() {
     const npc = npcs.find((n) => n.id === id);
     setNpcs((prev) => prev.filter((n) => n.id !== id));
     if (npc) addLog(`NPC removed: ${npc.name}.`);
+  };
+
+  const saveCurrentEncounter = () => {
+    const name = encounterName.trim();
+    if (!name) {
+      addLog("❌ Encounter name required.");
+      return;
+    }
+    if (!enemies.length) {
+      addLog("❌ No enemies to save.");
+      return;
+    }
+
+    const newEncounter = {
+      name,
+      enemies: enemies.map((e) => ({
+        name: e.name,
+        hp: e.hp,
+        maxHp: e.maxHp,
+        init: e.init,
+      })),
+    };
+
+    setSavedEncounters((prev) => {
+      const exists = prev.some((enc) => enc.name.toLowerCase() === name.toLowerCase());
+      if (exists) {
+        addLog(`❌ Encounter already exists: ${name}.`);
+        return prev;
+      }
+      addLog(`💾 Encounter saved: ${name}.`);
+      return [...prev, newEncounter];
+    });
+
+    setEncounterName("");
+  };
+
+  const loadEncounter = (encounter) => {
+    setEnemies(
+      encounter.enemies.map((e, idx) => ({
+        id: Date.now() + idx,
+        name: e.name,
+        hp: e.hp,
+        maxHp: e.maxHp || e.hp,
+        init: e.init || 0,
+      }))
+    );
+    setRound(1);
+    setTurnIndex(0);
+    addLog(`⚔️ Encounter loaded: ${encounter.name}.`);
+  };
+
+  const deleteEncounter = (name) => {
+    setSavedEncounters((prev) => prev.filter((enc) => enc.name !== name));
+    addLog(`🗑️ Encounter deleted: ${name}.`);
   };
 
   const initiative = useMemo(() => {
@@ -233,14 +322,7 @@ export default function App() {
   };
 
   const loadCultAmbush = () => {
-    setEnemies([
-      { id: Date.now() + 1, name: "Cultist Acolyte", hp: 9, maxHp: 9, init: 12 },
-      { id: Date.now() + 2, name: "Cultist Acolyte", hp: 9, maxHp: 9, init: 10 },
-      { id: Date.now() + 3, name: "Dark Adept", hp: 22, maxHp: 22, init: 14 },
-    ]);
-    setRound(1);
-    setTurnIndex(0);
-    addLog("Encounter loaded: Cult Ambush.");
+    loadEncounter(DEFAULT_ENCOUNTERS[0]);
   };
 
   const buildPrep = () => `## 🕯️ Session Prep
@@ -299,18 +381,17 @@ Earth Node Progress: ${nodeProgress}%`;
   };
 
   const layoutStyle = isMobile ? mobileGridStyle : desktopGridStyle;
-
-const leftStyle = isMobile ? mobileSectionStyle : leftColumnStyle;
-const topStyle = isMobile ? mobileSectionStyle : topBarStyle;
-const centerStyle = isMobile ? mobileSectionStyle : centerColumnStyle;
-const rightStyle = isMobile ? mobileSectionStyle : rightColumnStyle;
-const bottomStyle = isMobile ? mobileSectionStyle : bottomBarStyle;
+  const leftStyle = isMobile ? mobileSectionStyle : leftColumnStyle;
+  const topStyle = isMobile ? mobileSectionStyle : topBarStyle;
+  const centerStyle = isMobile ? mobileSectionStyle : centerColumnStyle;
+  const rightStyle = isMobile ? mobileSectionStyle : rightColumnStyle;
+  const bottomStyle = isMobile ? mobileSectionStyle : bottomBarStyle;
 
   return (
     <div style={pageStyle}>
       <h1 style={isMobile ? mobileTitleStyle : titleStyle}>
-  Greyhawk Command Console v2
-</h1>
+        Greyhawk Command Console v2
+      </h1>
 
       <main style={layoutStyle}>
         <div style={leftStyle}>
@@ -361,6 +442,15 @@ const bottomStyle = isMobile ? mobileSectionStyle : bottomBarStyle;
             nextTurn={nextTurn}
             resetCombat={resetCombat}
             loadCultAmbush={loadCultAmbush}
+          />
+
+          <EncounterLibraryPanel
+            encounterName={encounterName}
+            setEncounterName={setEncounterName}
+            saveCurrentEncounter={saveCurrentEncounter}
+            savedEncounters={savedEncounters}
+            loadEncounter={loadEncounter}
+            deleteEncounter={deleteEncounter}
           />
         </div>
 
@@ -429,15 +519,59 @@ function CombatPanel({ round, active, initiative, turnIndex, nextTurn, resetComb
 
       <div style={{ marginTop: 10 }}>
         {initiative.map((c, i) => (
-          <div key={`${c.type}-${c.id}`} style={i === turnIndex ? activeRowStyle : rowStyle}>
+          <div
+            key={`${c.type}-${c.id}`}
+            style={{
+              ...(i === turnIndex ? activeRowStyle : rowStyle),
+              ...(c.hp <= Math.floor(c.maxHp / 2) ? bloodiedStyle : {}),
+              ...(c.hp <= 0 ? deadStyle : {}),
+            }}
+          >
             {i === turnIndex ? "▶ " : ""}
             <strong>{c.init}</strong> — {c.name} ({c.type}) — {c.hp}/{c.maxHp} HP
+            {c.hp > 0 && c.hp <= Math.floor(c.maxHp / 2) && (
+              <span style={{ color: "#f87171", marginLeft: 8 }}>🩸 Bloodied</span>
+            )}
           </div>
         ))}
       </div>
 
       <div style={stickyTurnBarStyle}>
         <button style={{ ...buttonStyle, width: "100%" }} onClick={nextTurn}>▶ Next Turn</button>
+      </div>
+    </Panel>
+  );
+}
+
+function EncounterLibraryPanel({
+  encounterName,
+  setEncounterName,
+  saveCurrentEncounter,
+  savedEncounters,
+  loadEncounter,
+  deleteEncounter,
+}) {
+  return (
+    <Panel title="Encounter Library">
+      <input
+        style={inputStyle}
+        placeholder="Encounter name"
+        value={encounterName}
+        onChange={(e) => setEncounterName(e.target.value)}
+      />
+      <button style={buttonStyle} onClick={saveCurrentEncounter}>💾 Save Current Encounter</button>
+
+      <div style={encounterListStyle}>
+        {savedEncounters.map((enc) => (
+          <div key={enc.name} style={innerCardStyle}>
+            <strong>{enc.name}</strong>
+            <div style={{ fontSize: 13, opacity: 0.85 }}>
+              {enc.enemies.length} enemy/enemies
+            </div>
+            <button style={smallButtonStyle} onClick={() => loadEncounter(enc)}>Load</button>
+            <button style={dangerButtonStyle} onClick={() => deleteEncounter(enc.name)}>Delete</button>
+          </div>
+        ))}
       </div>
     </Panel>
   );
@@ -493,7 +627,14 @@ function EnemiesPanel({ enemies, enemyForm, setEnemyForm, addEnemy, updateEnemyH
       <input style={inputStyle} placeholder="Initiative" value={enemyForm.init} onChange={(e) => setEnemyForm({ ...enemyForm, init: e.target.value })} />
       <button style={buttonStyle} onClick={addEnemy}>Add Enemy</button>
       {enemies.map((e) => (
-        <div key={e.id} style={innerCardStyle}>
+        <div
+          key={e.id}
+          style={{
+            ...innerCardStyle,
+            ...(e.hp <= Math.floor(e.maxHp / 2) ? bloodiedStyle : {}),
+            ...(e.hp <= 0 ? deadStyle : {}),
+          }}
+        >
           <strong>{e.name}</strong>
           <div>{e.hp}/{e.maxHp} HP | Init {e.init}</div>
           <button style={smallButtonStyle} onClick={() => updateEnemyHp(e.id, -5)}>-5</button>
@@ -728,6 +869,19 @@ const activeRowStyle = {
   fontWeight: "bold",
 };
 
+const bloodiedStyle = {
+  border: "1px solid #dc2626",
+  boxShadow: "0 0 10px rgba(220,38,38,0.45)",
+  background: "linear-gradient(90deg,#3a1616,#1f1414)",
+};
+
+const deadStyle = {
+  opacity: 0.45,
+  background: "#1a0f0f",
+  border: "1px solid #7f1d1d",
+  textDecoration: "line-through",
+};
+
 const stickyTurnBarStyle = {
   position: "sticky",
   bottom: 0,
@@ -747,6 +901,12 @@ const textAreaStyle = {
   borderRadius: 6,
   boxSizing: "border-box",
   fontSize: 14,
+};
+
+const encounterListStyle = {
+  marginTop: 10,
+  maxHeight: 260,
+  overflowY: "auto",
 };
 
 const logBoxStyle = {
