@@ -675,7 +675,8 @@ function NpcPanel({ npcs, npcForm, setNpcForm, addNpc, removeNpc }) {
 
 const pageStyle = {
   minHeight: "100vh",
-  width: "100%",
+  width: "100vw",
+  maxWidth: "100vw",
   overflowX: "hidden",
   background: "radial-gradient(circle at top,#202733,#0b0f14)",
   color: "#e5e7eb",
@@ -692,7 +693,7 @@ const titleStyle = {
 
 const desktopGridStyle = {
   display: "grid",
-  gridTemplateColumns: "320px 1fr 320px",
+  gridTemplateColumns: "minmax(340px, 420px) minmax(520px, 1fr) minmax(340px, 420px)",
   gridTemplateRows: "auto 1fr 180px",
   gridTemplateAreas: `
     "left top right"
@@ -700,6 +701,8 @@ const desktopGridStyle = {
     "bottom bottom bottom"
   `,
   gap: 12,
+  width: "100%",
+  maxWidth: "100%",
   minHeight: "calc(100vh - 80px)",
 };
 
