@@ -48,6 +48,22 @@ function loadSaved(key, fallback) {
   }
 }
 
+function downloadJSON(data, filename) {
+  const blob = new Blob(
+    [JSON.stringify(data, null, 2)],
+    { type: "application/json" }
+  );
+
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+
+  URL.revokeObjectURL(url);
+}
+
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -442,7 +458,100 @@ Earth Node Progress: ${nodeProgress}%`;
     });
   };
 
-  const resetSavedState = () => {
+const getCampaignState = () => ({
+  party,
+  enemies,
+  turnIndex,
+  round,
+  npcs,
+  encounterName,
+  savedEncounters,
+  earthCult,
+  dungeonAlert,
+  nodeProgress,
+  calendar,
+  log,
+});
+
+const saveCampaign = () => {
+  const data = getCampaignState();
+  localStorage.setItem("greyhawkCampaignSave", JSON.stringify(data));
+  addLog("💾 Campaign saved.");
+};
+
+const loadCampaign = () => {
+  const raw = localStorage.getItem("greyhawkCampaignSave");
+  if (!raw) {
+    addLog("⚠️ No campaign save found.");
+    return;
+  }
+
+  try {
+    const data = JSON.parse(raw);
+    setParty(data.party || []);
+    setEnemies(data.enemies || []);
+    setTurnIndex(data.turnIndex || 0);
+    setRound(data.round || 1);
+    setNpcs(data.npcs || []);
+    setEncounterName(data.encounterName || "");
+    setSavedEncounters(data.savedEncounters || DEFAULT_ENCOUNTERS);
+    setEarthCult(data.earthCult ?? 3);
+    setDungeonAlert(data.dungeonAlert ?? 3);
+    setNodeProgress(data.nodeProgress ?? 35);
+    setCalendar(data.calendar || calendar);
+    setLog(data.log || []);
+    addLog("📂 Campaign loaded.");
+  } catch {
+    addLog("❌ Campaign load failed.");
+  }
+};
+
+const exportCampaign = () => {
+  const data = getCampaignState();
+  downloadJSON(data, `GreyhawkCampaign_Session${calendar.session}.json`);
+  addLog("📤 Campaign exported.");
+};
+
+const importCampaign = (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      setParty(data.party || []);
+      setEnemies(data.enemies || []);
+      setTurnIndex(data.turnIndex || 0);
+      setRound(data.round || 1);
+      setNpcs(data.npcs || []);
+      setEncounterName(data.encounterName || "");
+      setSavedEncounters(data.savedEncounters || DEFAULT_ENCOUNTERS);
+      setEarthCult(data.earthCult ?? 3);
+      setDungeonAlert(data.dungeonAlert ?? 3);
+      setNodeProgress(data.nodeProgress ?? 35);
+      setCalendar(data.calendar || calendar);
+      setLog(data.log || []);
+      addLog("📥 Campaign imported.");
+    } catch {
+      addLog("❌ Campaign import failed.");
+    }
+  };
+  reader.readAsText(file);
+};
+
+useEffect(() => {
+  const interval = setInterval(() => {
+    localStorage.setItem(
+      "greyhawkCampaignAutosave",
+      JSON.stringify(getCampaignState())
+    );
+  }, 60000);
+
+  return () => clearInterval(interval);
+}, [party, enemies, turnIndex, round, npcs, encounterName, savedEncounters, earthCult, dungeonAlert, nodeProgress, calendar, log]);  
+
+const resetSavedState = () => {
     localStorage.clear();
     window.location.reload();
   };
@@ -595,6 +704,31 @@ Earth Node Progress: ${nodeProgress}%`;
           </Panel>
 
           <Panel title="DM Actions">
+<Panel title="Campaign Memory">
+  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    <button style={buttonStyle} onClick={saveCampaign}>
+      💾 Save Campaign
+    </button>
+
+    <button style={buttonStyle} onClick={loadCampaign}>
+      📂 Load Campaign
+    </button>
+
+    <button style={buttonStyle} onClick={exportCampaign}>
+      📤 Export JSON
+    </button>
+
+    <label style={buttonStyle}>
+      📥 Import JSON
+      <input
+        type="file"
+        accept=".json"
+        onChange={importCampaign}
+        style={{ display: "none" }}
+      />
+    </label>
+  </div>
+</Panel>
             <button style={buttonStyle} onClick={() => postToDiscord("dm-control-room", buildSnapshot())}>📊 DM Snapshot</button>
             <button style={dangerButtonStyle} onClick={resetSavedState}>Reset Saved State</button>
           </Panel>
