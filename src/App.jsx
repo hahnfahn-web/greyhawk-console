@@ -8,29 +8,124 @@ const CONDITIONS = [
   "Restrained", "Stunned", "Invisible", "Concentrating", "Unconscious",
 ];
 
+const MONSTER_CONDITIONS = [
+  "Prone", "Poisoned", "Restrained", "Frightened", "Stunned",
+  "Invisible", "Concentrating", "Charmed", "Grappled", "Dead",
+];
+
 const DEFAULT_ENCOUNTERS = [
   {
     name: "Cult Ambush",
     enemies: [
-      { name: "Cultist Acolyte", hp: 9, maxHp: 9, init: 12 },
-      { name: "Cultist Acolyte", hp: 9, maxHp: 9, init: 10 },
-      { name: "Dark Adept", hp: 22, maxHp: 22, init: 14 },
+      {
+        name: "Cultist Acolyte",
+        hp: 9,
+        maxHp: 9,
+        ac: 12,
+        init: 12,
+        xp: 25,
+        actions: ["Scimitar", "Dark Prayer", "Dodge", "Disengage"],
+        tactics: ["Swarm isolated targets.", "Protect the adept.", "Flee if alone and bloodied."],
+        loot: ["2d6 cp", "earth cult token"],
+      },
+      {
+        name: "Cultist Acolyte",
+        hp: 9,
+        maxHp: 9,
+        ac: 12,
+        init: 10,
+        xp: 25,
+        actions: ["Scimitar", "Dark Prayer", "Dodge", "Disengage"],
+        tactics: ["Swarm isolated targets.", "Protect the adept.", "Flee if alone and bloodied."],
+        loot: ["1d6 sp"],
+      },
+      {
+        name: "Dark Adept",
+        hp: 22,
+        maxHp: 22,
+        ac: 13,
+        init: 14,
+        xp: 100,
+        actions: ["Mace", "Sacred Flame", "Bless", "Command", "Retreat"],
+        tactics: ["Open with Bless if allies remain.", "Target wounded or isolated PCs.", "Retreat toward reinforcements when bloodied."],
+        loot: ["ritual dagger", "black earth charm", "12 sp"],
+      },
     ],
   },
   {
     name: "Gnoll Patrol",
     enemies: [
-      { name: "Gnoll", hp: 22, maxHp: 22, init: 13 },
-      { name: "Gnoll", hp: 22, maxHp: 22, init: 11 },
-      { name: "Gnoll Pack Lord", hp: 49, maxHp: 49, init: 15 },
+      {
+        name: "Gnoll",
+        hp: 22,
+        maxHp: 22,
+        ac: 15,
+        init: 13,
+        xp: 100,
+        actions: ["Bite", "Spear", "Rampage", "Dash"],
+        tactics: ["Attack wounded targets.", "Use Rampage after dropping a foe.", "Fight brutally unless leader falls."],
+        loot: ["crude spear", "3d6 cp"],
+      },
+      {
+        name: "Gnoll",
+        hp: 22,
+        maxHp: 22,
+        ac: 15,
+        init: 11,
+        xp: 100,
+        actions: ["Bite", "Spear", "Rampage", "Dash"],
+        tactics: ["Flank with allies.", "Attack lightly armored PCs.", "Retreat if pack lord dies."],
+        loot: ["bone charm", "1d6 sp"],
+      },
+      {
+        name: "Gnoll Pack Lord",
+        hp: 49,
+        maxHp: 49,
+        ac: 15,
+        init: 15,
+        xp: 450,
+        actions: ["Glaive", "Bite", "Incite Rampage", "Threaten", "Retreat"],
+        tactics: ["Lead from the front.", "Focus the strongest-looking warrior.", "Use allies to surround spellcasters."],
+        loot: ["iron torc", "bloody battle standard", "2d10 sp"],
+      },
     ],
   },
   {
     name: "Earth Temple Guard",
     enemies: [
-      { name: "Earth Guard", hp: 45, maxHp: 45, init: 10 },
-      { name: "Earth Guard", hp: 45, maxHp: 45, init: 9 },
-      { name: "Earth Priest", hp: 60, maxHp: 60, init: 12 },
+      {
+        name: "Earth Guard",
+        hp: 45,
+        maxHp: 45,
+        ac: 16,
+        init: 10,
+        xp: 200,
+        actions: ["Warhammer", "Shield Bash", "Guard Priest", "Dodge"],
+        tactics: ["Hold chokepoints.", "Protect the priest.", "Do not pursue far from assigned post."],
+        loot: ["heavy shield", "earth temple tabard"],
+      },
+      {
+        name: "Earth Guard",
+        hp: 45,
+        maxHp: 45,
+        ac: 16,
+        init: 9,
+        xp: 200,
+        actions: ["Warhammer", "Shield Bash", "Guard Priest", "Dodge"],
+        tactics: ["Block exits.", "Target intruders near the priest.", "Call alarm if outmatched."],
+        loot: ["warhammer", "8 sp"],
+      },
+      {
+        name: "Earth Priest",
+        hp: 60,
+        maxHp: 60,
+        ac: 14,
+        init: 12,
+        xp: 450,
+        actions: ["Mace", "Hold Person", "Spiritual Weapon", "Cure Wounds", "Command Retreat"],
+        tactics: ["Disable dangerous melee attackers.", "Use guards as cover.", "Heal only if it preserves command of the fight."],
+        loot: ["obsidian holy symbol", "scroll fragment", "25 sp"],
+      },
     ],
   },
 ];
@@ -49,19 +144,49 @@ function loadSaved(key, fallback) {
 }
 
 function downloadJSON(data, filename) {
-  const blob = new Blob(
-    [JSON.stringify(data, null, 2)],
-    { type: "application/json" }
-  );
-
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
-
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
   a.click();
-
   URL.revokeObjectURL(url);
+}
+
+function normalizeMonster(monster, index = 0) {
+  return {
+    id: monster.id || Date.now() + index,
+    name: monster.name || "Unknown Foe",
+    hp: Number(monster.hp ?? monster.maxHp ?? 1),
+    maxHp: Number(monster.maxHp ?? monster.hp ?? 1),
+    ac: Number(monster.ac ?? 12),
+    init: Number(monster.init ?? 0),
+    xp: Number(monster.xp ?? 0),
+    conditions: monster.conditions || [],
+    actions: monster.actions || ["Attack", "Dodge", "Disengage", "Flee"],
+    tactics: monster.tactics || ["Attack the nearest threat.", "Use cover if available.", "Retreat if bloodied."],
+    loot: monster.loot || [],
+  };
+}
+
+function getPhase(hour) {
+  if (hour >= 6 && hour <= 11) return "Morning";
+  if (hour >= 12 && hour <= 16) return "Afternoon";
+  if (hour >= 17 && hour <= 20) return "Evening";
+  return "Night";
+}
+
+function formatHour(hour) {
+  const safeHour = typeof hour === "number" ? hour : 8;
+  const suffix = safeHour >= 12 ? "PM" : "AM";
+  const normalized = safeHour % 12 || 12;
+  return `${normalized}:00 ${suffix}`;
+}
+
+function nextMoonPhase(current) {
+  const phases = ["New Moon", "Waxing", "Full Moon", "Waning"];
+  const idx = phases.indexOf(current);
+  return phases[(idx + 1) % phases.length];
 }
 
 function useIsMobile() {
@@ -73,25 +198,6 @@ function useIsMobile() {
     return () => window.removeEventListener("resize", check);
   }, []);
   return isMobile;
-}
-
-function getPhase(hour) {
-  if (hour >= 6 && hour <= 11) return "Morning";
-  if (hour >= 12 && hour <= 16) return "Afternoon";
-  if (hour >= 17 && hour <= 20) return "Evening";
-  return "Night";
-}
-
-function formatHour(hour) {
-  const suffix = hour >= 12 ? "PM" : "AM";
-  const normalized = hour % 12 || 12;
-  return `${normalized}:00 ${suffix}`;
-}
-
-function nextMoonPhase(current) {
-  const phases = ["New Moon", "Waxing", "Full Moon", "Waning"];
-  const idx = phases.indexOf(current);
-  return phases[(idx + 1) % phases.length];
 }
 
 export default function App() {
@@ -132,10 +238,13 @@ export default function App() {
   );
 
   const [enemies, setEnemies] = useState(() => loadSaved("enemies", []));
-  const [enemyForm, setEnemyForm] = useState({ name: "", hp: "", init: "" });
+  const [defeatedEnemies, setDefeatedEnemies] = useState(() => loadSaved("defeatedEnemies", []));
+  const [enemyForm, setEnemyForm] = useState({ name: "", hp: "", ac: "", init: "", xp: "" });
 
   const [round, setRound] = useState(() => loadSaved("round", 1));
   const [turnIndex, setTurnIndex] = useState(() => loadSaved("turnIndex", 0));
+  const [activeEncounterName, setActiveEncounterName] = useState(() => loadSaved("activeEncounterName", "Current Encounter"));
+  const [encounterSummary, setEncounterSummary] = useState(() => loadSaved("encounterSummary", ""));
 
   const [npcs, setNpcs] = useState(() => loadSaved("npcs", []));
   const [npcForm, setNpcForm] = useState({
@@ -162,14 +271,50 @@ export default function App() {
   useEffect(() => localStorage.setItem("nodeProgress", JSON.stringify(nodeProgress)), [nodeProgress]);
   useEffect(() => localStorage.setItem("party", JSON.stringify(party)), [party]);
   useEffect(() => localStorage.setItem("enemies", JSON.stringify(enemies)), [enemies]);
+  useEffect(() => localStorage.setItem("defeatedEnemies", JSON.stringify(defeatedEnemies)), [defeatedEnemies]);
   useEffect(() => localStorage.setItem("round", JSON.stringify(round)), [round]);
   useEffect(() => localStorage.setItem("turnIndex", JSON.stringify(turnIndex)), [turnIndex]);
+  useEffect(() => localStorage.setItem("activeEncounterName", JSON.stringify(activeEncounterName)), [activeEncounterName]);
+  useEffect(() => localStorage.setItem("encounterSummary", JSON.stringify(encounterSummary)), [encounterSummary]);
   useEffect(() => localStorage.setItem("npcs", JSON.stringify(npcs)), [npcs]);
   useEffect(() => localStorage.setItem("sessionPrep", JSON.stringify(sessionPrep)), [sessionPrep]);
   useEffect(() => localStorage.setItem("savedEncounters", JSON.stringify(savedEncounters)), [savedEncounters]);
 
   const addLog = (msg) =>
-    setLog((prev) => [`${new Date().toLocaleTimeString()} — ${msg}`, ...prev].slice(0, 50));
+    setLog((prev) => [`${new Date().toLocaleTimeString()} — ${msg}`, ...prev].slice(0, 75));
+
+  const initiative = useMemo(() => {
+    const pcs = party.map((p, i) => ({ ...p, id: `pc-${i}`, type: "PC" }));
+    const foes = enemies.map((e) => ({ ...e, id: `enemy-${e.id}`, type: "Enemy" }));
+    return [...pcs, ...foes].sort((a, b) => b.init - a.init || a.name.localeCompare(b.name));
+  }, [party, enemies]);
+
+  const active = initiative[turnIndex] || null;
+
+  const getCampaignState = () => ({
+    party,
+    enemies,
+    defeatedEnemies,
+    turnIndex,
+    round,
+    activeEncounterName,
+    encounterSummary,
+    npcs,
+    encounterName,
+    savedEncounters,
+    earthCult,
+    dungeonAlert,
+    nodeProgress,
+    calendar,
+    log,
+  });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      localStorage.setItem("greyhawkCampaignAutosave", JSON.stringify(getCampaignState()));
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [party, enemies, defeatedEnemies, turnIndex, round, activeEncounterName, encounterSummary, npcs, encounterName, savedEncounters, earthCult, dungeonAlert, nodeProgress, calendar, log]);
 
   const postToDiscord = async (target, message) => {
     if (!bridgeUrl || !apiKey) {
@@ -233,15 +378,17 @@ export default function App() {
 
   const addEnemy = () => {
     if (!enemyForm.name.trim() || !enemyForm.hp) return;
-    const enemy = {
+    const enemy = normalizeMonster({
       id: Date.now(),
       name: enemyForm.name.trim(),
       hp: Number(enemyForm.hp),
       maxHp: Number(enemyForm.hp),
+      ac: Number(enemyForm.ac || 12),
       init: Number(enemyForm.init || 0),
-    };
+      xp: Number(enemyForm.xp || 0),
+    });
     setEnemies((prev) => [...prev, enemy]);
-    setEnemyForm({ name: "", hp: "", init: "" });
+    setEnemyForm({ name: "", hp: "", ac: "", init: "", xp: "" });
     addLog(`Enemy added: ${enemy.name}.`);
   };
 
@@ -252,6 +399,8 @@ export default function App() {
         const newHp = clamp(e.hp + amount, 0, e.maxHp);
 
         if (newHp <= 0) {
+          const defeated = { ...e, hp: 0, conditions: [...new Set([...(e.conditions || []), "Dead"])] };
+          setDefeatedEnemies((old) => [...old, defeated]);
           addLog(`☠️ ${e.name} has fallen.`);
           return [];
         }
@@ -265,10 +414,32 @@ export default function App() {
     });
   };
 
+  const toggleEnemyCondition = (id, condition) => {
+    if (condition === "Dead") {
+      updateEnemyHp(id, -9999);
+      return;
+    }
+    setEnemies((prev) =>
+      prev.map((e) => {
+        if (e.id !== id) return e;
+        const current = e.conditions || [];
+        const has = current.includes(condition);
+        return {
+          ...e,
+          conditions: has ? current.filter((c) => c !== condition) : [...current, condition],
+        };
+      })
+    );
+  };
+
   const removeEnemy = (id) => {
     const enemy = enemies.find((e) => e.id === id);
     setEnemies((prev) => prev.filter((e) => e.id !== id));
     if (enemy) addLog(`Enemy removed: ${enemy.name}.`);
+  };
+
+  const recordMonsterAction = (monsterName, action) => {
+    addLog(`🎲 ${monsterName} uses ${action}.`);
   };
 
   const addNpc = () => {
@@ -295,17 +466,10 @@ export default function App() {
       addLog("❌ No enemies to save.");
       return;
     }
-
     const newEncounter = {
       name,
-      enemies: enemies.map((e) => ({
-        name: e.name,
-        hp: e.hp,
-        maxHp: e.maxHp,
-        init: e.init,
-      })),
+      enemies: enemies.map((e) => ({ ...e, id: undefined })),
     };
-
     setSavedEncounters((prev) => {
       const exists = prev.some((enc) => enc.name.toLowerCase() === name.toLowerCase());
       if (exists) {
@@ -315,20 +479,14 @@ export default function App() {
       addLog(`💾 Encounter saved: ${name}.`);
       return [...prev, newEncounter];
     });
-
     setEncounterName("");
   };
 
   const loadEncounter = (encounter) => {
-    setEnemies(
-      encounter.enemies.map((e, idx) => ({
-        id: Date.now() + idx,
-        name: e.name,
-        hp: e.hp,
-        maxHp: e.maxHp || e.hp,
-        init: e.init || 0,
-      }))
-    );
+    setEnemies(encounter.enemies.map((e, idx) => normalizeMonster(e, idx)));
+    setDefeatedEnemies([]);
+    setEncounterSummary("");
+    setActiveEncounterName(encounter.name);
     setRound(1);
     setTurnIndex(0);
     addLog(`⚔️ Encounter loaded: ${encounter.name}.`);
@@ -338,14 +496,6 @@ export default function App() {
     setSavedEncounters((prev) => prev.filter((enc) => enc.name !== name));
     addLog(`🗑️ Encounter deleted: ${name}.`);
   };
-
-  const initiative = useMemo(() => {
-    const pcs = party.map((p, i) => ({ ...p, id: `pc-${i}`, type: "PC" }));
-    const foes = enemies.map((e) => ({ ...e, id: `enemy-${e.id}`, type: "Enemy" }));
-    return [...pcs, ...foes].sort((a, b) => b.init - a.init || a.name.localeCompare(b.name));
-  }, [party, enemies]);
-
-  const active = initiative[turnIndex] || null;
 
   const nextTurn = () => {
     if (!initiative.length) return;
@@ -363,6 +513,8 @@ export default function App() {
   const resetCombat = () => {
     setRound(1);
     setTurnIndex(0);
+    setDefeatedEnemies([]);
+    setEncounterSummary("");
     addLog("Combat reset.");
   };
 
@@ -370,11 +522,39 @@ export default function App() {
     loadEncounter(DEFAULT_ENCOUNTERS[0]);
   };
 
+  const advanceTime = (hours = 0, minutes = 0) => {
+    setCalendar((prev) => {
+      let newHour = typeof prev.time === "number" ? prev.time : 8;
+      let newTurn = prev.dungeonTurn || 0;
+      if (minutes >= 10) newTurn += Math.floor(minutes / 10);
+      newHour += hours;
+      let newDay = prev.day || 6;
+      let newMoon = prev.moonPhase || "Waxing";
+      while (newHour >= 24) {
+        newHour -= 24;
+        newDay += 1;
+        newMoon = nextMoonPhase(newMoon);
+        addLog("🌙 A new day dawns over Greyhawk.");
+      }
+      const phase = getPhase(newHour);
+      addLog(`🕒 Time advances to ${formatHour(newHour)} (${phase}).`);
+      return {
+        ...prev,
+        day: newDay,
+        time: newHour,
+        phase,
+        dungeonTurn: newTurn,
+        moonPhase: newMoon,
+        date: `${newDay} ${prev.month || "Sunsebb"}, ${prev.year || 576} CY`,
+      };
+    });
+  };
+
   const buildPrep = () => `## 🕯️ Session Prep
 
 **Date:** ${calendar.date}, ${calendar.phase}, ${formatHour(calendar.time)}
-**Dungeon Turn:** ${calendar.dungeonTurn}
-**Moon Phase:** ${calendar.moonPhase}
+**Dungeon Turn:** ${calendar.dungeonTurn || 0}
+**Moon Phase:** ${calendar.moonPhase || "Waxing"}
 **Session:** #${calendar.session}
 **Earth Cult Alert:** ${earthCult}/5
 **Dungeon Alert:** ${dungeonAlert}/5
@@ -392,18 +572,16 @@ export default function App() {
         return `${p.name}: ${p.hp}/${p.maxHp} HP | AC ${p.ac} | Init ${p.init}${cond}`;
       })
       .join("\n");
-
     const enemyText = enemies.length
-      ? enemies.map((e) => `${e.name}: ${e.hp}/${e.maxHp} HP | Init ${e.init}`).join("\n")
+      ? enemies.map((e) => `${e.name}: ${e.hp}/${e.maxHp} HP | AC ${e.ac} | Init ${e.init}`).join("\n")
       : "None";
-
     const initiativeText = initiative
       .map((c, idx) => `${idx === turnIndex ? "▶ " : ""}${c.init} — ${c.name} (${c.type})`)
       .join("\n");
-
     return `📊 **SESSION SNAPSHOT**
 
 🎯 **Combat**
+Encounter: ${activeEncounterName}
 Round: ${round}
 Current: ${active ? active.name : "N/A"}
 
@@ -417,113 +595,69 @@ ${enemyText}
 ${initiativeText}
 
 🌍 **World State**
+Date: ${calendar.date}, ${calendar.phase}, ${formatHour(calendar.time)}
+Moon: ${calendar.moonPhase || "Waxing"}
+Dungeon Turn: ${calendar.dungeonTurn || 0}
 Earth Cult Alert: ${earthCult}/5
 Dungeon Alert: ${dungeonAlert}/5
 Earth Node Progress: ${nodeProgress}%`;
   };
 
-  const advanceTime = (hours = 0, minutes = 0) => {
-    setCalendar((prev) => {
-      let newHour = typeof prev.time === "number" ? prev.time : 8;
-      let newTurn = prev.dungeonTurn || 0;
+  const buildEncounterSummary = () => {
+    const defeated = defeatedEnemies;
+    const totalXp = defeated.reduce((sum, e) => sum + Number(e.xp || 0), 0);
+    const partyCount = Math.max(party.length, 1);
+    const perPlayer = Math.floor(totalXp / partyCount);
+    const loot = defeated.flatMap((e) => e.loot || []);
+    return `## ⚔️ Encounter Complete — ${activeEncounterName || "Current Encounter"}
 
-      if (minutes >= 10) {
-        newTurn += Math.floor(minutes / 10);
-      }
+**Rounds:** ${round}
 
-      newHour += hours;
+### Enemies Defeated
+${defeated.length ? defeated.map((e) => `• ${e.name} (${e.xp || 0} XP)`).join("\n") : "None recorded"}
 
-      let newDay = prev.day || 6;
-      let newMoon = prev.moonPhase || "Waxing";
+### XP Awarded
+**Total XP:** ${totalXp}
+**Per Character:** ${perPlayer}
 
-      while (newHour >= 24) {
-        newHour -= 24;
-        newDay += 1;
-        newMoon = nextMoonPhase(newMoon);
-        addLog("🌙 A new day dawns over Greyhawk.");
-      }
+### Treasure / Loot
+${loot.length ? loot.map((item) => `• ${item}`).join("\n") : "No treasure recorded."}
 
-      const phase = getPhase(newHour);
-      addLog(`🕒 Time advances to ${formatHour(newHour)} (${phase}).`);
-
-      return {
-        ...prev,
-        day: newDay,
-        time: newHour,
-        phase,
-        dungeonTurn: newTurn,
-        moonPhase: newMoon,
-        date: `${newDay} ${prev.month || "Sunsebb"}, ${prev.year || 576} CY`,
-      };
-    });
+### Combat Notes
+${log.slice(0, 10).map((entry) => `• ${entry}`).join("\n")}`;
   };
 
-const getCampaignState = () => ({
-  party,
-  enemies,
-  turnIndex,
-  round,
-  npcs,
-  encounterName,
-  savedEncounters,
-  earthCult,
-  dungeonAlert,
-  nodeProgress,
-  calendar,
-  log,
-});
+  const endEncounter = () => {
+    const summary = buildEncounterSummary();
+    setEncounterSummary(summary);
+    addLog("⚔️ Encounter summary generated.");
+  };
 
-const saveCampaign = () => {
-  const data = getCampaignState();
-  localStorage.setItem("greyhawkCampaignSave", JSON.stringify(data));
-  addLog("💾 Campaign saved.");
-};
+  const postEncounterSummary = () => {
+    const summary = encounterSummary || buildEncounterSummary();
+    postToDiscord("dm-control-room", summary);
+  };
 
-const loadCampaign = () => {
-  const raw = localStorage.getItem("greyhawkCampaignSave");
-  if (!raw) {
-    addLog("⚠️ No campaign save found.");
-    return;
-  }
+  const saveCampaign = () => {
+    localStorage.setItem("greyhawkCampaignSave", JSON.stringify(getCampaignState()));
+    addLog("💾 Campaign saved.");
+  };
 
-  try {
-    const data = JSON.parse(raw);
-    setParty(data.party || []);
-    setEnemies(data.enemies || []);
-    setTurnIndex(data.turnIndex || 0);
-    setRound(data.round || 1);
-    setNpcs(data.npcs || []);
-    setEncounterName(data.encounterName || "");
-    setSavedEncounters(data.savedEncounters || DEFAULT_ENCOUNTERS);
-    setEarthCult(data.earthCult ?? 3);
-    setDungeonAlert(data.dungeonAlert ?? 3);
-    setNodeProgress(data.nodeProgress ?? 35);
-    setCalendar(data.calendar || calendar);
-    setLog(data.log || []);
-    addLog("📂 Campaign loaded.");
-  } catch {
-    addLog("❌ Campaign load failed.");
-  }
-};
-
-const exportCampaign = () => {
-  const data = getCampaignState();
-  downloadJSON(data, `GreyhawkCampaign_Session${calendar.session}.json`);
-  addLog("📤 Campaign exported.");
-};
-
-const importCampaign = (event) => {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = (e) => {
+  const loadCampaign = () => {
+    const raw = localStorage.getItem("greyhawkCampaignSave");
+    if (!raw) {
+      addLog("⚠️ No campaign save found.");
+      return;
+    }
     try {
-      const data = JSON.parse(e.target.result);
+      const data = JSON.parse(raw);
       setParty(data.party || []);
       setEnemies(data.enemies || []);
+      setDefeatedEnemies(data.defeatedEnemies || []);
       setTurnIndex(data.turnIndex || 0);
       setRound(data.round || 1);
+      setActiveEncounterName(data.activeEncounterName || "Current Encounter");
+      setEncounterSummary(data.encounterSummary || "");
       setNpcs(data.npcs || []);
       setEncounterName(data.encounterName || "");
       setSavedEncounters(data.savedEncounters || DEFAULT_ENCOUNTERS);
@@ -532,26 +666,48 @@ const importCampaign = (event) => {
       setNodeProgress(data.nodeProgress ?? 35);
       setCalendar(data.calendar || calendar);
       setLog(data.log || []);
-      addLog("📥 Campaign imported.");
+      addLog("📂 Campaign loaded.");
     } catch {
-      addLog("❌ Campaign import failed.");
+      addLog("❌ Campaign load failed.");
     }
   };
-  reader.readAsText(file);
-};
 
-useEffect(() => {
-  const interval = setInterval(() => {
-    localStorage.setItem(
-      "greyhawkCampaignAutosave",
-      JSON.stringify(getCampaignState())
-    );
-  }, 60000);
+  const exportCampaign = () => {
+    downloadJSON(getCampaignState(), `GreyhawkCampaign_Session${calendar.session}.json`);
+    addLog("📤 Campaign exported.");
+  };
 
-  return () => clearInterval(interval);
-}, [party, enemies, turnIndex, round, npcs, encounterName, savedEncounters, earthCult, dungeonAlert, nodeProgress, calendar, log]);  
+  const importCampaign = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        setParty(data.party || []);
+        setEnemies(data.enemies || []);
+        setDefeatedEnemies(data.defeatedEnemies || []);
+        setTurnIndex(data.turnIndex || 0);
+        setRound(data.round || 1);
+        setActiveEncounterName(data.activeEncounterName || "Current Encounter");
+        setEncounterSummary(data.encounterSummary || "");
+        setNpcs(data.npcs || []);
+        setEncounterName(data.encounterName || "");
+        setSavedEncounters(data.savedEncounters || DEFAULT_ENCOUNTERS);
+        setEarthCult(data.earthCult ?? 3);
+        setDungeonAlert(data.dungeonAlert ?? 3);
+        setNodeProgress(data.nodeProgress ?? 35);
+        setCalendar(data.calendar || calendar);
+        setLog(data.log || []);
+        addLog("📥 Campaign imported.");
+      } catch {
+        addLog("❌ Campaign import failed.");
+      }
+    };
+    reader.readAsText(file);
+  };
 
-const resetSavedState = () => {
+  const resetSavedState = () => {
     localStorage.clear();
     window.location.reload();
   };
@@ -565,25 +721,11 @@ const resetSavedState = () => {
 
   return (
     <div style={pageStyle}>
-      <h1 style={isMobile ? mobileTitleStyle : titleStyle}>
-        Greyhawk Command Console v2
-      </h1>
-
+      <h1 style={isMobile ? mobileTitleStyle : titleStyle}>Greyhawk Command Console v3</h1>
       <main style={layoutStyle}>
         <div style={leftStyle}>
-          <PartyPanel
-            party={party}
-            updatePartyField={updatePartyField}
-            updatePartyHp={updatePartyHp}
-            toggleCondition={toggleCondition}
-          />
-          <NpcPanel
-            npcs={npcs}
-            npcForm={npcForm}
-            setNpcForm={setNpcForm}
-            addNpc={addNpc}
-            removeNpc={removeNpc}
-          />
+          <PartyPanel party={party} updatePartyField={updatePartyField} updatePartyHp={updatePartyHp} toggleCondition={toggleCondition} />
+          <NpcPanel npcs={npcs} npcForm={npcForm} setNpcForm={setNpcForm} addNpc={addNpc} removeNpc={removeNpc} />
         </div>
 
         <div style={topStyle}>
@@ -591,44 +733,7 @@ const resetSavedState = () => {
             <input style={inputStyle} value={bridgeUrl} onChange={(e) => setBridgeUrl(e.target.value)} />
             <input style={inputStyle} type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
           </Panel>
-
-          <Panel title="World Clock">
-            <div style={{ fontSize: 20, marginBottom: 6 }}>
-              📅 {calendar.date}
-            </div>
-
-            <div style={{ fontSize: 18, color: "#f2d28b", marginBottom: 6 }}>
-              ☀️ {calendar.phase}
-            </div>
-
-            <div style={{ fontSize: 18, marginBottom: 6 }}>
-              🕒 {formatHour(typeof calendar.time === "number" ? calendar.time : 8)}
-            </div>
-
-            <div style={{ marginBottom: 6 }}>
-              🌙 Moon: {calendar.moonPhase || "Waxing"}
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
-              🏰 Dungeon Turn: {calendar.dungeonTurn || 0}
-            </div>
-
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              <button style={smallButtonStyle} onClick={() => advanceTime(0, 10)}>
-                +10 Min
-              </button>
-              <button style={smallButtonStyle} onClick={() => advanceTime(1, 0)}>
-                +1 Hour
-              </button>
-              <button style={smallButtonStyle} onClick={() => advanceTime(4, 0)}>
-                +4 Hours
-              </button>
-              <button style={smallButtonStyle} onClick={() => advanceTime(24, 0)}>
-                Next Day
-              </button>
-            </div>
-          </Panel>
-
+          <WorldClockPanel calendar={calendar} advanceTime={advanceTime} />
           <Panel title="Faction / Node">
             <div>Earth Cult: {earthCult}/5</div>
             <div>Dungeon: {dungeonAlert}/5</div>
@@ -637,25 +742,14 @@ const resetSavedState = () => {
             <button style={smallButtonStyle} onClick={() => setDungeonAlert((v) => clamp(v + 1, 0, 5))}>Dungeon +</button>
             <button style={smallButtonStyle} onClick={() => setNodeProgress((v) => clamp(v + 10, 0, 100))}>Node +</button>
           </Panel>
-
-<Panel title="Fantasy Calendar">
-  <div style={{ marginBottom: 10 }}>
-    Greyhawk Campaign Calendar
-  </div>
-
-  <a
-    href="https://app.fantasy-calendar.com/calendars/448b4c997c5b2eacf40f46c3fc43fdba"
-    target="_blank"
-    rel="noreferrer"
-    style={linkButtonStyle}
-  >
-    Open Fantasy Calendar
-  </a>
-</Panel>
+          <Panel title="Fantasy Calendar">
+            <div style={{ marginBottom: 10 }}>Greyhawk Campaign Calendar</div>
+            <a href="https://app.fantasy-calendar.com/calendars/448b4c997c5b2eacf40f46c3fc43fdba" target="_blank" rel="noreferrer" style={linkButtonStyle}>Open Fantasy Calendar</a>
+          </Panel>
         </div>
 
         <div style={centerStyle}>
-          <CombatPanel
+          <CombatDirectorPanel
             round={round}
             active={active}
             initiative={initiative}
@@ -663,34 +757,23 @@ const resetSavedState = () => {
             nextTurn={nextTurn}
             resetCombat={resetCombat}
             loadCultAmbush={loadCultAmbush}
+            recordMonsterAction={recordMonsterAction}
+            defeatedEnemies={defeatedEnemies}
+            enemies={enemies}
+            endEncounter={endEncounter}
+            encounterSummary={encounterSummary}
+            postEncounterSummary={postEncounterSummary}
           />
-
-          <EncounterLibraryPanel
-            encounterName={encounterName}
-            setEncounterName={setEncounterName}
-            saveCurrentEncounter={saveCurrentEncounter}
-            savedEncounters={savedEncounters}
-            loadEncounter={loadEncounter}
-            deleteEncounter={deleteEncounter}
-          />
+          <EncounterLibraryPanel encounterName={encounterName} setEncounterName={setEncounterName} saveCurrentEncounter={saveCurrentEncounter} savedEncounters={savedEncounters} loadEncounter={loadEncounter} deleteEncounter={deleteEncounter} />
         </div>
 
         <div style={rightStyle}>
-          <EnemiesPanel
-            enemies={enemies}
-            enemyForm={enemyForm}
-            setEnemyForm={setEnemyForm}
-            addEnemy={addEnemy}
-            updateEnemyHp={updateEnemyHp}
-            removeEnemy={removeEnemy}
-          />
-
+          <EnemiesPanel enemies={enemies} enemyForm={enemyForm} setEnemyForm={setEnemyForm} addEnemy={addEnemy} updateEnemyHp={updateEnemyHp} removeEnemy={removeEnemy} toggleEnemyCondition={toggleEnemyCondition} />
           <Panel title="Session Prep">
             <button style={buttonStyle} onClick={() => setSessionPrep(buildPrep())}>Auto Fill</button>
             <button style={buttonStyle} onClick={() => postToDiscord("session-prep", sessionPrep || buildPrep())}>Post</button>
             <textarea style={textAreaStyle} value={sessionPrep} onChange={(e) => setSessionPrep(e.target.value)} />
           </Panel>
-
           <Panel title="Post to Channel">
             <select style={inputStyle} value={channel} onChange={(e) => setChannel(e.target.value)}>
               <option value="dm-control-room">#dm-control-room</option>
@@ -702,43 +785,19 @@ const resetSavedState = () => {
             <textarea style={textAreaStyle} value={customMsg} onChange={(e) => setCustomMsg(e.target.value)} />
             <button style={buttonStyle} onClick={() => postToDiscord(channel, customMsg)}>Post Message</button>
           </Panel>
-
           <Panel title="DM Actions">
-<Panel title="Campaign Memory">
-  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-    <button style={buttonStyle} onClick={saveCampaign}>
-      💾 Save Campaign
-    </button>
-
-    <button style={buttonStyle} onClick={loadCampaign}>
-      📂 Load Campaign
-    </button>
-
-    <button style={buttonStyle} onClick={exportCampaign}>
-      📤 Export JSON
-    </button>
-
-    <label style={buttonStyle}>
-      📥 Import JSON
-      <input
-        type="file"
-        accept=".json"
-        onChange={importCampaign}
-        style={{ display: "none" }}
-      />
-    </label>
-  </div>
-</Panel>
             <button style={buttonStyle} onClick={() => postToDiscord("dm-control-room", buildSnapshot())}>📊 DM Snapshot</button>
+            <button style={buttonStyle} onClick={saveCampaign}>💾 Save Campaign</button>
+            <button style={buttonStyle} onClick={loadCampaign}>📂 Load Campaign</button>
+            <button style={buttonStyle} onClick={exportCampaign}>📤 Export JSON</button>
+            <label style={buttonStyle}>📥 Import JSON<input type="file" accept=".json" onChange={importCampaign} style={{ display: "none" }} /></label>
             <button style={dangerButtonStyle} onClick={resetSavedState}>Reset Saved State</button>
           </Panel>
         </div>
 
         <div style={bottomStyle}>
           <Panel title="Log">
-            <div style={logBoxStyle}>
-              {log.length === 0 ? <p>No actions yet.</p> : log.map((l, i) => <div key={i}>• {l}</div>)}
-            </div>
+            <div style={logBoxStyle}>{log.length === 0 ? <p>No actions yet.</p> : log.map((l, i) => <div key={i}>• {l}</div>)}</div>
           </Panel>
         </div>
       </main>
@@ -755,31 +814,58 @@ function Panel({ title, children }) {
   );
 }
 
-
-
-function CombatPanel({ round, active, initiative, turnIndex, nextTurn, resetCombat, loadCultAmbush }) {
+function WorldClockPanel({ calendar, advanceTime }) {
   return (
-    <Panel title="Combat">
+    <Panel title="World Clock">
+      <div style={{ fontSize: 20, marginBottom: 6 }}>📅 {calendar.date}</div>
+      <div style={{ fontSize: 18, color: "#f2d28b", marginBottom: 6 }}>☀️ {calendar.phase}</div>
+      <div style={{ fontSize: 18, marginBottom: 6 }}>🕒 {formatHour(calendar.time)}</div>
+      <div style={{ marginBottom: 6 }}>🌙 Moon: {calendar.moonPhase || "Waxing"}</div>
+      <div style={{ marginBottom: 12 }}>🏰 Dungeon Turn: {calendar.dungeonTurn || 0}</div>
+      <button style={smallButtonStyle} onClick={() => advanceTime(0, 10)}>+10 Min</button>
+      <button style={smallButtonStyle} onClick={() => advanceTime(1, 0)}>+1 Hour</button>
+      <button style={smallButtonStyle} onClick={() => advanceTime(4, 0)}>+4 Hours</button>
+      <button style={smallButtonStyle} onClick={() => advanceTime(24, 0)}>Next Day</button>
+    </Panel>
+  );
+}
+
+function CombatDirectorPanel({ round, active, initiative, turnIndex, nextTurn, resetCombat, loadCultAmbush, recordMonsterAction, defeatedEnemies, enemies, endEncounter, encounterSummary, postEncounterSummary }) {
+  const currentMonster = active?.type === "Enemy" ? active : null;
+  const allEnemiesDefeated = enemies.length === 0 && defeatedEnemies.length > 0;
+
+  return (
+    <Panel title="Combat Director">
       <div><strong>Round:</strong> {round}</div>
       <div><strong>Current:</strong> {active ? `${active.name} (${active.type})` : "None"}</div>
       <button style={buttonStyle} onClick={resetCombat}>Reset</button>
       <button style={buttonStyle} onClick={loadCultAmbush}>Cult Ambush</button>
 
+      {currentMonster && (
+        <div style={directorCardStyle}>
+          <h3 style={subHeaderStyle}>Monster Turn: {currentMonster.name}</h3>
+          <div><strong>HP:</strong> {currentMonster.hp}/{currentMonster.maxHp} | <strong>AC:</strong> {currentMonster.ac}</div>
+          <div style={{ marginTop: 8 }}>
+            <strong>Suggested Tactics</strong>
+            <ul style={{ marginTop: 4 }}>
+              {(currentMonster.tactics || []).map((t, i) => <li key={i}>{t}</li>)}
+              {currentMonster.hp <= Math.floor(currentMonster.maxHp / 2) && <li>Bloodied: consider retreat, defensive action, or calling for aid.</li>}
+            </ul>
+          </div>
+          <div style={buttonWrapStyle}>
+            {(currentMonster.actions || []).map((action) => (
+              <button key={action} style={buttonStyle} onClick={() => recordMonsterAction(currentMonster.name, action)}>{action}</button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div style={{ marginTop: 10 }}>
         {initiative.map((c, i) => (
-          <div
-            key={`${c.type}-${c.id}`}
-            style={{
-              ...(i === turnIndex ? activeRowStyle : rowStyle),
-              ...(c.hp <= Math.floor(c.maxHp / 2) ? bloodiedStyle : {}),
-              ...(c.hp <= 0 ? deadStyle : {}),
-            }}
-          >
-            {i === turnIndex ? "▶ " : ""}
-            <strong>{c.init}</strong> — {c.name} ({c.type}) — {c.hp}/{c.maxHp} HP
-            {c.hp > 0 && c.hp <= Math.floor(c.maxHp / 2) && (
-              <span style={{ color: "#f87171", marginLeft: 8 }}>🩸 Bloodied</span>
-            )}
+          <div key={`${c.type}-${c.id}`} style={{ ...(i === turnIndex ? activeRowStyle : rowStyle), ...(c.hp <= Math.floor(c.maxHp / 2) ? bloodiedStyle : {}) }}>
+            {i === turnIndex ? "▶ " : ""}<strong>{c.init}</strong> — {c.name} ({c.type}) — {c.hp}/{c.maxHp} HP
+            {c.hp > 0 && c.hp <= Math.floor(c.maxHp / 2) && <span style={{ color: "#f87171", marginLeft: 8 }}>🩸 Bloodied</span>}
+            {c.conditions?.length > 0 && <span style={{ color: "#f2d28b", marginLeft: 8 }}>({c.conditions.join(", ")})</span>}
           </div>
         ))}
       </div>
@@ -787,35 +873,27 @@ function CombatPanel({ round, active, initiative, turnIndex, nextTurn, resetComb
       <div style={stickyTurnBarStyle}>
         <button style={{ ...buttonStyle, width: "100%" }} onClick={nextTurn}>▶ Next Turn</button>
       </div>
+
+      <div style={{ marginTop: 12 }}>
+        <button style={allEnemiesDefeated ? buttonStyle : disabledButtonStyle} onClick={endEncounter} disabled={!allEnemiesDefeated}>⚔️ End Encounter</button>
+        <button style={encounterSummary ? buttonStyle : disabledButtonStyle} onClick={postEncounterSummary} disabled={!encounterSummary}>Post Summary</button>
+      </div>
+
+      {encounterSummary && <textarea style={{ ...textAreaStyle, minHeight: 220 }} value={encounterSummary} readOnly />}
     </Panel>
   );
 }
 
-function EncounterLibraryPanel({
-  encounterName,
-  setEncounterName,
-  saveCurrentEncounter,
-  savedEncounters,
-  loadEncounter,
-  deleteEncounter,
-}) {
+function EncounterLibraryPanel({ encounterName, setEncounterName, saveCurrentEncounter, savedEncounters, loadEncounter, deleteEncounter }) {
   return (
     <Panel title="Encounter Library">
-      <input
-        style={inputStyle}
-        placeholder="Encounter name"
-        value={encounterName}
-        onChange={(e) => setEncounterName(e.target.value)}
-      />
+      <input style={inputStyle} placeholder="Encounter name" value={encounterName} onChange={(e) => setEncounterName(e.target.value)} />
       <button style={buttonStyle} onClick={saveCurrentEncounter}>💾 Save Current Encounter</button>
-
       <div style={encounterListStyle}>
         {savedEncounters.map((enc) => (
           <div key={enc.name} style={innerCardStyle}>
             <strong>{enc.name}</strong>
-            <div style={{ fontSize: 13, opacity: 0.85 }}>
-              {enc.enemies.length} enemy/enemies
-            </div>
+            <div style={{ fontSize: 13, opacity: 0.85 }}>{enc.enemies.length} enemy/enemies</div>
             <button style={smallButtonStyle} onClick={() => loadEncounter(enc)}>Load</button>
             <button style={dangerButtonStyle} onClick={() => deleteEncounter(enc.name)}>Delete</button>
           </div>
@@ -846,19 +924,7 @@ function PartyPanel({ party, updatePartyField, updatePartyHp, toggleCondition })
           <div style={conditionWrapStyle}>
             {CONDITIONS.map((c) => {
               const activeCondition = p.conditions.includes(c);
-              return (
-                <button
-                  key={c}
-                  onClick={() => toggleCondition(i, c)}
-                  style={{
-                    ...conditionButtonStyle,
-                    background: activeCondition ? "#8a6d1d" : "#1f2937",
-                    color: activeCondition ? "#fff2b8" : "#e5e7eb",
-                  }}
-                >
-                  {c}
-                </button>
-              );
+              return <button key={c} onClick={() => toggleCondition(i, c)} style={{ ...conditionButtonStyle, background: activeCondition ? "#8a6d1d" : "#1f2937", color: activeCondition ? "#fff2b8" : "#e5e7eb" }}>{c}</button>;
             })}
           </div>
         </div>
@@ -867,27 +933,35 @@ function PartyPanel({ party, updatePartyField, updatePartyHp, toggleCondition })
   );
 }
 
-function EnemiesPanel({ enemies, enemyForm, setEnemyForm, addEnemy, updateEnemyHp, removeEnemy }) {
+function EnemiesPanel({ enemies, enemyForm, setEnemyForm, addEnemy, updateEnemyHp, removeEnemy, toggleEnemyCondition }) {
   return (
-    <Panel title="Enemies">
+    <Panel title="Monster Control">
       <input style={inputStyle} placeholder="Enemy name" value={enemyForm.name} onChange={(e) => setEnemyForm({ ...enemyForm, name: e.target.value })} />
-      <input style={inputStyle} placeholder="HP" value={enemyForm.hp} onChange={(e) => setEnemyForm({ ...enemyForm, hp: e.target.value })} />
-      <input style={inputStyle} placeholder="Initiative" value={enemyForm.init} onChange={(e) => setEnemyForm({ ...enemyForm, init: e.target.value })} />
-      <button style={buttonStyle} onClick={addEnemy}>Add Enemy</button>
+      <div style={miniGridStyle}>
+        <input style={inputStyle} placeholder="HP" value={enemyForm.hp} onChange={(e) => setEnemyForm({ ...enemyForm, hp: e.target.value })} />
+        <input style={inputStyle} placeholder="AC" value={enemyForm.ac} onChange={(e) => setEnemyForm({ ...enemyForm, ac: e.target.value })} />
+        <input style={inputStyle} placeholder="Init" value={enemyForm.init} onChange={(e) => setEnemyForm({ ...enemyForm, init: e.target.value })} />
+        <input style={inputStyle} placeholder="XP" value={enemyForm.xp} onChange={(e) => setEnemyForm({ ...enemyForm, xp: e.target.value })} />
+      </div>
+      <button style={buttonStyle} onClick={addEnemy}>Add Monster</button>
       {enemies.map((e) => (
-        <div
-          key={e.id}
-          style={{
-            ...innerCardStyle,
-            ...(e.hp <= Math.floor(e.maxHp / 2) ? bloodiedStyle : {}),
-            ...(e.hp <= 0 ? deadStyle : {}),
-          }}
-        >
+        <div key={e.id} style={{ ...innerCardStyle, ...(e.hp <= Math.floor(e.maxHp / 2) ? bloodiedStyle : {}) }}>
           <strong>{e.name}</strong>
-          <div>{e.hp}/{e.maxHp} HP | Init {e.init}</div>
-          <button style={smallButtonStyle} onClick={() => updateEnemyHp(e.id, -5)}>-5</button>
-          <button style={smallButtonStyle} onClick={() => updateEnemyHp(e.id, 5)}>+5</button>
-          <button style={dangerButtonStyle} onClick={() => removeEnemy(e.id)}>Remove</button>
+          <div>{e.hp}/{e.maxHp} HP | AC {e.ac} | Init {e.init} | XP {e.xp}</div>
+          <div style={buttonWrapStyle}>
+            <button style={smallButtonStyle} onClick={() => updateEnemyHp(e.id, -1)}>-1</button>
+            <button style={smallButtonStyle} onClick={() => updateEnemyHp(e.id, -5)}>-5</button>
+            <button style={smallButtonStyle} onClick={() => updateEnemyHp(e.id, -10)}>-10</button>
+            <button style={smallButtonStyle} onClick={() => updateEnemyHp(e.id, 5)}>+5</button>
+            <button style={dangerButtonStyle} onClick={() => toggleEnemyCondition(e.id, "Dead")}>Dead</button>
+            <button style={dangerButtonStyle} onClick={() => removeEnemy(e.id)}>Remove</button>
+          </div>
+          <div style={conditionWrapStyle}>
+            {MONSTER_CONDITIONS.map((c) => {
+              const activeCondition = (e.conditions || []).includes(c);
+              return <button key={c} onClick={() => toggleEnemyCondition(e.id, c)} style={{ ...conditionButtonStyle, background: activeCondition ? "#8a6d1d" : "#1f2937", color: activeCondition ? "#fff2b8" : "#e5e7eb" }}>{c}</button>;
+            })}
+          </div>
         </div>
       ))}
     </Panel>
@@ -901,10 +975,7 @@ function NpcPanel({ npcs, npcForm, setNpcForm, addNpc, removeNpc }) {
       <input style={inputStyle} placeholder="Role" value={npcForm.role} onChange={(e) => setNpcForm({ ...npcForm, role: e.target.value })} />
       <input style={inputStyle} placeholder="Faction" value={npcForm.faction} onChange={(e) => setNpcForm({ ...npcForm, faction: e.target.value })} />
       <select style={inputStyle} value={npcForm.attitude} onChange={(e) => setNpcForm({ ...npcForm, attitude: e.target.value })}>
-        <option>Friendly</option>
-        <option>Neutral</option>
-        <option>Suspicious</option>
-        <option>Hostile</option>
+        <option>Friendly</option><option>Neutral</option><option>Suspicious</option><option>Hostile</option>
       </select>
       <textarea style={textAreaStyle} placeholder="Notes" value={npcForm.notes} onChange={(e) => setNpcForm({ ...npcForm, notes: e.target.value })} />
       <button style={buttonStyle} onClick={addNpc}>Add NPC</button>
@@ -921,258 +992,38 @@ function NpcPanel({ npcs, npcForm, setNpcForm, addNpc, removeNpc }) {
   );
 }
 
-const pageStyle = {
-  minHeight: "100vh",
-  width: "100vw",
-  maxWidth: "100vw",
-  overflowX: "hidden",
-  background: "radial-gradient(circle at top,#202733,#0b0f14)",
-  color: "#e5e7eb",
-  fontFamily: "Georgia, 'Times New Roman', serif",
-  padding: 12,
-  boxSizing: "border-box",
-};
-
-const titleStyle = {
-  textAlign: "center",
-  color: "#f2d28b",
-  margin: "8px 0 14px",
-};
-
-const desktopGridStyle = {
-  display: "grid",
-  gridTemplateColumns: "minmax(340px, 420px) minmax(520px, 1fr) minmax(340px, 420px)",
-  gridTemplateRows: "auto 1fr 180px",
-  gridTemplateAreas: `
-    "left top right"
-    "left center right"
-    "bottom bottom bottom"
-  `,
-  gap: 12,
-  width: "100%",
-  maxWidth: "100%",
-  minHeight: "calc(100vh - 80px)",
-};
-
-const mobileGridStyle = {
-  display: "grid",
-  gridTemplateColumns: "1fr",
-  gap: 12,
-};
-
-const mobileSectionStyle = {
-  display: "grid",
-  gap: 12,
-  alignContent: "start",
-  minWidth: 0,
-};
-
-const mobileTitleStyle = {
-  textAlign: "center",
-  color: "#f2d28b",
-  margin: "8px 0 14px",
-  fontSize: 36,
-  lineHeight: 1,
-};
-
-const leftColumnStyle = {
-  gridArea: "left",
-  display: "grid",
-  gap: 12,
-  alignContent: "start",
-  minHeight: 0,
-  overflowY: "auto",
-};
-
-const topBarStyle = {
-  gridArea: "top",
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: 12,
-  alignContent: "start",
-};
-
-const centerColumnStyle = {
-  gridArea: "center",
-  minHeight: 0,
-  overflowY: "auto",
-};
-
-const rightColumnStyle = {
-  gridArea: "right",
-  display: "grid",
-  gap: 12,
-  alignContent: "start",
-  minHeight: 0,
-  overflowY: "auto",
-};
-
-const bottomBarStyle = {
-  gridArea: "bottom",
-  minHeight: 0,
-};
-
-const cardStyle = {
-  background: "#0d1117",
-  border: "1px solid #3b4351",
-  borderRadius: 8,
-  padding: 12,
-  boxSizing: "border-box",
-  minWidth: 0,
-};
-
-const innerCardStyle = {
-  background: "#121821",
-  border: "1px solid #303845",
-  borderRadius: 6,
-  padding: 8,
-  marginBottom: 8,
-};
-
-const panelTitleStyle = {
-  color: "#f2d28b",
-  margin: "0 0 8px",
-  borderBottom: "1px solid #35291a",
-  paddingBottom: 4,
-  textTransform: "uppercase",
-  fontSize: 17,
-};
-
-const inputStyle = {
-  width: "100%",
-  padding: 9,
-  marginBottom: 8,
-  background: "#111827",
-  color: "#e5e7eb",
-  border: "1px solid #3b4351",
-  borderRadius: 6,
-  boxSizing: "border-box",
-  fontSize: 14,
-};
-
-const smallInputStyle = {
-  width: 54,
-  padding: 7,
-  background: "#111827",
-  color: "#e5e7eb",
-  border: "1px solid #3b4351",
-  borderRadius: 6,
-};
-
-const buttonStyle = {
-  background: "linear-gradient(180deg, #4b5563 0%, #252b34 100%)",
-  color: "#f8fafc",
-  border: "1px solid #6b7280",
-  borderRadius: 6,
-  padding: "9px 12px",
-  cursor: "pointer",
-  margin: 4,
-  fontSize: 14,
-};
-
-const smallButtonStyle = {
-  ...buttonStyle,
-  padding: "6px 9px",
-  fontSize: 13,
-};
-
-const dangerButtonStyle = {
-  ...smallButtonStyle,
-  background: "linear-gradient(180deg, #7f1d1d 0%, #3f1111 100%)",
-  border: "1px solid #b91c1c",
-};
-
-const flexRowStyle = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: 6,
-  alignItems: "center",
-};
-
-const conditionWrapStyle = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: 4,
-  marginTop: 6,
-};
-
-const conditionButtonStyle = {
-  border: "1px solid #3b4351",
-  borderRadius: 4,
-  padding: "4px 6px",
-  fontSize: 11,
-  cursor: "pointer",
-};
-
-const rowStyle = {
-  padding: 14,
-  marginBottom: 8,
-  border: "1px solid #303845",
-  borderRadius: 6,
-  fontSize: 18,
-  background: "#1d222b",
-};
-
-const activeRowStyle = {
-  ...rowStyle,
-  background: "linear-gradient(90deg, #6b4f1d, #2a2112)",
-  border: "1px solid #d6a03d",
-  fontWeight: "bold",
-};
-
-const bloodiedStyle = {
-  border: "1px solid #dc2626",
-  boxShadow: "0 0 10px rgba(220,38,38,0.45)",
-  background: "linear-gradient(90deg,#3a1616,#1f1414)",
-};
-
-const deadStyle = {
-  opacity: 0.45,
-  background: "#1a0f0f",
-  border: "1px solid #7f1d1d",
-  textDecoration: "line-through",
-};
-
-const stickyTurnBarStyle = {
-  position: "sticky",
-  bottom: 0,
-  background: "#0d1117",
-  paddingTop: 10,
-  marginTop: 10,
-};
-
-const textAreaStyle = {
-  width: "100%",
-  minHeight: 120,
-  padding: 10,
-  marginBottom: 8,
-  background: "#111827",
-  color: "#e5e7eb",
-  border: "1px solid #3b4351",
-  borderRadius: 6,
-  boxSizing: "border-box",
-  fontSize: 14,
-};
-
-const encounterListStyle = {
-  marginTop: 10,
-  maxHeight: 260,
-  overflowY: "auto",
-};
-
-const logBoxStyle = {
-  maxHeight: 135,
-  overflowY: "auto",
-  fontSize: 13,
-};
-
-const linkButtonStyle = {
-  display: "inline-block",
-  textDecoration: "none",
-  color: "#fff",
-  background: "linear-gradient(180deg, #4b5563 0%, #252b34 100%)",
-  border: "1px solid #6b7280",
-  borderRadius: 6,
-  padding: "10px 14px",
-  fontWeight: "bold",
-};
+const pageStyle = { minHeight: "100vh", width: "100vw", maxWidth: "100vw", overflowX: "hidden", background: "radial-gradient(circle at top,#202733,#0b0f14)", color: "#e5e7eb", fontFamily: "Georgia, 'Times New Roman', serif", padding: 12, boxSizing: "border-box" };
+const titleStyle = { textAlign: "center", color: "#f2d28b", margin: "8px 0 14px" };
+const mobileTitleStyle = { ...titleStyle, fontSize: 36, lineHeight: 1 };
+const desktopGridStyle = { display: "grid", gridTemplateColumns: "minmax(360px, 440px) minmax(620px, 1fr) minmax(360px, 440px)", gridTemplateRows: "auto 1fr 180px", gridTemplateAreas: `"left top right" "left center right" "bottom bottom bottom"`, gap: 12, width: "100%", maxWidth: "100%", minHeight: "calc(100vh - 80px)" };
+const mobileGridStyle = { display: "grid", gridTemplateColumns: "1fr", gap: 12 };
+const mobileSectionStyle = { display: "grid", gap: 12, alignContent: "start", minWidth: 0 };
+const leftColumnStyle = { gridArea: "left", display: "grid", gap: 12, alignContent: "start", minHeight: 0, overflowY: "auto" };
+const topBarStyle = { gridArea: "top", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, alignContent: "start" };
+const centerColumnStyle = { gridArea: "center", minHeight: 0, overflowY: "auto" };
+const rightColumnStyle = { gridArea: "right", display: "grid", gap: 12, alignContent: "start", minHeight: 0, overflowY: "auto" };
+const bottomBarStyle = { gridArea: "bottom", minHeight: 0 };
+const cardStyle = { background: "#0d1117", border: "1px solid #3b4351", borderRadius: 8, padding: 12, boxSizing: "border-box", minWidth: 0 };
+const innerCardStyle = { background: "#121821", border: "1px solid #303845", borderRadius: 6, padding: 8, marginBottom: 8 };
+const directorCardStyle = { ...innerCardStyle, background: "#151b25", border: "1px solid #8a6d1d" };
+const panelTitleStyle = { color: "#f2d28b", margin: "0 0 8px", borderBottom: "1px solid #35291a", paddingBottom: 4, textTransform: "uppercase", fontSize: 17 };
+const subHeaderStyle = { color: "#f2d28b", margin: "4px 0 8px" };
+const inputStyle = { width: "100%", padding: 9, marginBottom: 8, background: "#111827", color: "#e5e7eb", border: "1px solid #3b4351", borderRadius: 6, boxSizing: "border-box", fontSize: 14 };
+const smallInputStyle = { width: 54, padding: 7, background: "#111827", color: "#e5e7eb", border: "1px solid #3b4351", borderRadius: 6 };
+const buttonStyle = { background: "linear-gradient(180deg, #4b5563 0%, #252b34 100%)", color: "#f8fafc", border: "1px solid #6b7280", borderRadius: 6, padding: "9px 12px", cursor: "pointer", margin: 4, fontSize: 14 };
+const disabledButtonStyle = { ...buttonStyle, opacity: 0.45, cursor: "not-allowed" };
+const smallButtonStyle = { ...buttonStyle, padding: "6px 9px", fontSize: 13 };
+const dangerButtonStyle = { ...smallButtonStyle, background: "linear-gradient(180deg, #7f1d1d 0%, #3f1111 100%)", border: "1px solid #b91c1c" };
+const flexRowStyle = { display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" };
+const buttonWrapStyle = { display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center", marginTop: 6 };
+const conditionWrapStyle = { display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 };
+const conditionButtonStyle = { border: "1px solid #3b4351", borderRadius: 4, padding: "4px 6px", fontSize: 11, cursor: "pointer" };
+const rowStyle = { padding: 14, marginBottom: 8, border: "1px solid #303845", borderRadius: 6, fontSize: 18, background: "#1d222b" };
+const activeRowStyle = { ...rowStyle, background: "linear-gradient(90deg, #6b4f1d, #2a2112)", border: "1px solid #d6a03d", fontWeight: "bold" };
+const bloodiedStyle = { border: "1px solid #dc2626", boxShadow: "0 0 10px rgba(220,38,38,0.45)", background: "linear-gradient(90deg,#3a1616,#1f1414)" };
+const stickyTurnBarStyle = { position: "sticky", bottom: 0, background: "#0d1117", paddingTop: 10, marginTop: 10 };
+const textAreaStyle = { width: "100%", minHeight: 120, padding: 10, marginBottom: 8, background: "#111827", color: "#e5e7eb", border: "1px solid #3b4351", borderRadius: 6, boxSizing: "border-box", fontSize: 14 };
+const encounterListStyle = { marginTop: 10, maxHeight: 260, overflowY: "auto" };
+const logBoxStyle = { maxHeight: 135, overflowY: "auto", fontSize: 13 };
+const linkButtonStyle = { display: "inline-block", textDecoration: "none", color: "#fff", background: "linear-gradient(180deg, #4b5563 0%, #252b34 100%)", border: "1px solid #6b7280", borderRadius: 6, padding: "10px 14px", fontWeight: "bold" };
+const miniGridStyle = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 6 };
