@@ -516,6 +516,17 @@ export default function App() {
   const [activeEncounterName, setActiveEncounterName] = useState(() => loadSaved("activeEncounterName", "Current Encounter"));
   const [encounterSummary, setEncounterSummary] = useState(() => loadSaved("encounterSummary", ""));
   const [selectedActionInfo, setSelectedActionInfo] = useState(() => loadSaved("selectedActionInfo", null));
+  const [editingMonsterId, setEditingMonsterId] = useState(null);
+  const [editingActionIndex, setEditingActionIndex] = useState(null);
+  const [actionEditor, setActionEditor] = useState({
+    name: "",
+    attackBonus: "",
+    save: "",
+    dc: "",
+    hit: "",
+    effect: "",
+    tactics: "",
+  });
 
   const [npcs, setNpcs] = useState(() => loadSaved("npcs", []));
   const [npcForm, setNpcForm] = useState({
@@ -754,6 +765,55 @@ export default function App() {
     const details = getActionDetails(monster, action);
     setSelectedActionInfo({ monsterName: monster.name, action: actionName, ...details });
     addLog(`🎲 ${monster.name} considers ${actionName}.`);
+  };
+
+  const startEditingAction = (monster, action, actionIndex) => {
+    const actionObject = typeof action === "string" ? { name: action } : action;
+
+    setEditingMonsterId(monster.id);
+    setEditingActionIndex(actionIndex);
+
+    setActionEditor({
+      name: actionObject.name || "",
+      attackBonus: actionObject.attackBonus || monster.attackBonus || "",
+      save: actionObject.save || "",
+      dc: actionObject.dc || monster.spellSaveDc || "",
+      hit: actionObject.hit || "",
+      effect: actionObject.effect || "",
+      tactics: actionObject.tactics || actionObject.note || "",
+    });
+  };
+
+  const saveEditedAction = () => {
+    if (editingMonsterId === null || editingActionIndex === null) return;
+
+    setEnemies((prev) =>
+      prev.map((monster) => {
+        if (monster.id !== editingMonsterId) return monster;
+
+        const updatedActions = [...(monster.actions || [])];
+
+        updatedActions[editingActionIndex] = {
+          name: actionEditor.name,
+          attackBonus: Number(actionEditor.attackBonus || monster.attackBonus || 0),
+          save: actionEditor.save,
+          dc: Number(actionEditor.dc || monster.spellSaveDc || 0),
+          hit: actionEditor.hit,
+          effect: actionEditor.effect,
+          tactics: actionEditor.tactics,
+        };
+
+        return {
+          ...monster,
+          actions: updatedActions,
+        };
+      })
+    );
+
+    addLog(`✏️ Updated action: ${actionEditor.name}.`);
+
+    setEditingMonsterId(null);
+    setEditingActionIndex(null);
   };
 
   const addNpc = () => {
@@ -1117,6 +1177,12 @@ Earth Node Progress: ${nodeProgress}%`;
             resetCombat={resetCombat}
             loadCultAmbush={loadCultAmbush}
             recordMonsterAction={recordMonsterAction}
+            startEditingAction={startEditingAction}
+            editingMonsterId={editingMonsterId}
+            editingActionIndex={editingActionIndex}
+            actionEditor={actionEditor}
+            setActionEditor={setActionEditor}
+            saveEditedAction={saveEditedAction}
             selectedActionInfo={selectedActionInfo}
             defeatedEnemies={defeatedEnemies}
             enemies={enemies}
@@ -1198,7 +1264,7 @@ function WorldClockPanel({ calendar, advanceTime }) {
   );
 }
 
-function CombatDirectorPanel({ round, active, initiative, turnIndex, nextTurn, resetCombat, loadCultAmbush, recordMonsterAction, selectedActionInfo, defeatedEnemies, enemies, endEncounter, encounterSummary, postEncounterSummary, postEncounterLoot }) {
+function CombatDirectorPanel({ round, active, initiative, turnIndex, nextTurn, resetCombat, loadCultAmbush, recordMonsterAction, startEditingAction, editingMonsterId, editingActionIndex, actionEditor, setActionEditor, saveEditedAction, selectedActionInfo, defeatedEnemies, enemies, endEncounter, encounterSummary, postEncounterSummary, postEncounterLoot }) {
   const currentMonster = active?.type === "Enemy" ? active : null;
   const allEnemiesDefeated = enemies.length === 0 && defeatedEnemies.length > 0;
 
@@ -1221,16 +1287,24 @@ function CombatDirectorPanel({ round, active, initiative, turnIndex, nextTurn, r
             </ul>
           </div>
           <div style={buttonWrapStyle}>
-            {(currentMonster.actions || []).map((action) => {
+            {(currentMonster.actions || []).map((action, actionIndex) => {
               const actionName = typeof action === "string" ? action : action.name;
               return (
-                <button
-                  key={actionName}
-                  style={buttonStyle}
-                  onClick={() => recordMonsterAction(currentMonster, action)}
-                >
-                  {actionName}
-                </button>
+                <div key={actionName} style={{ marginBottom: 6 }}>
+                  <button
+                    style={buttonStyle}
+                    onClick={() => recordMonsterAction(currentMonster, action)}
+                  >
+                    {actionName}
+                  </button>
+
+                  <button
+                    style={smallButtonStyle}
+                    onClick={() => startEditingAction(currentMonster, action, actionIndex)}
+                  >
+                    ✏️ Edit
+                  </button>
+                </div>
               );
             })}
           </div>
@@ -1271,6 +1345,30 @@ function CombatDirectorPanel({ round, active, initiative, turnIndex, nextTurn, r
               </div>
             )}
           </div>
+
+          {editingMonsterId === currentMonster.id && editingActionIndex !== null && (
+            <div style={actionEditorStyle}>
+              <h4 style={subHeaderStyle}>Edit Monster Action</h4>
+
+              <input style={inputStyle} placeholder="Action Name" value={actionEditor.name} onChange={(e) => setActionEditor({ ...actionEditor, name: e.target.value })} />
+
+              <div style={miniGridStyle}>
+                <input style={inputStyle} placeholder="Attack Bonus" value={actionEditor.attackBonus} onChange={(e) => setActionEditor({ ...actionEditor, attackBonus: e.target.value })} />
+
+                <input style={inputStyle} placeholder="Save DC" value={actionEditor.dc} onChange={(e) => setActionEditor({ ...actionEditor, dc: e.target.value })} />
+              </div>
+
+              <input style={inputStyle} placeholder="Saving Throw Type" value={actionEditor.save} onChange={(e) => setActionEditor({ ...actionEditor, save: e.target.value })} />
+
+              <textarea style={textAreaStyle} placeholder="Hit / Damage" value={actionEditor.hit} onChange={(e) => setActionEditor({ ...actionEditor, hit: e.target.value })} />
+
+              <textarea style={textAreaStyle} placeholder="Effect" value={actionEditor.effect} onChange={(e) => setActionEditor({ ...actionEditor, effect: e.target.value })} />
+
+              <textarea style={textAreaStyle} placeholder="Tactics" value={actionEditor.tactics} onChange={(e) => setActionEditor({ ...actionEditor, tactics: e.target.value })} />
+
+              <button style={buttonStyle} onClick={saveEditedAction}>💾 Save Action</button>
+            </div>
+          )}
 
           {selectedActionInfo && selectedActionInfo.monsterName === currentMonster.name && (
             <div style={actionDetailStyle}>
@@ -1475,6 +1573,7 @@ const innerCardStyle = { background: "#121821", border: "1px solid #303845", bor
 const directorCardStyle = { ...innerCardStyle, background: "#151b25", border: "1px solid #8a6d1d" };
 const actionDetailStyle = { marginTop: 10, padding: 10, background: "#0f172a", border: "1px solid #8a6d1d", borderRadius: 6 };
 const monsterStatCardStyle = { marginTop: 10, padding: 12, background: "#111827", border: "1px solid #4b5563", borderRadius: 6 };
+const actionEditorStyle = { marginTop: 10, padding: 12, background: "#161f2d", border: "1px solid #4b5563", borderRadius: 6 };
 const panelTitleStyle = { color: "#f2d28b", margin: "0 0 8px", borderBottom: "1px solid #35291a", paddingBottom: 4, textTransform: "uppercase", fontSize: 17 };
 const subHeaderStyle = { color: "#f2d28b", margin: "4px 0 8px" };
 const inputStyle = { width: "100%", padding: 9, marginBottom: 8, background: "#111827", color: "#e5e7eb", border: "1px solid #3b4351", borderRadius: 6, boxSizing: "border-box", fontSize: 14 };
