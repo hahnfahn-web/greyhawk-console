@@ -510,6 +510,23 @@ export default function App() {
   const [enemyForm, setEnemyForm] = useState({ name: "", hp: "", ac: "", init: "", xp: "" });
   const [monsterLibrary, setMonsterLibrary] = useState(() => loadSaved("monsterLibrary", DEFAULT_MONSTER_LIBRARY));
   const [monsterSearch, setMonsterSearch] = useState("");
+  const [selectedLibraryMonster, setSelectedLibraryMonster] = useState(null);
+  const [monsterEditor, setMonsterEditor] = useState({
+    name: "",
+    hp: "",
+    ac: "",
+    init: "",
+    xp: "",
+    attackBonus: "",
+    spellSaveDc: "",
+    spellAttackBonus: "",
+    speed: "",
+    senses: "",
+    languages: "",
+    traits: "",
+    tactics: "",
+    loot: "",
+  });
 
   const [round, setRound] = useState(() => loadSaved("round", 1));
   const [turnIndex, setTurnIndex] = useState(() => loadSaved("turnIndex", 0));
@@ -707,6 +724,115 @@ export default function App() {
       addLog(`💾 Monster saved to library: ${monster.name}.`);
       return [...prev, { ...monster, id: undefined }];
     });
+  };
+
+  const openMonsterEditor = (monster) => {
+    setSelectedLibraryMonster(monster.name);
+
+    setMonsterEditor({
+      name: monster.name || "",
+      hp: monster.maxHp || monster.hp || "",
+      ac: monster.ac || "",
+      init: monster.init || "",
+      xp: monster.xp || "",
+      attackBonus: monster.attackBonus || "",
+      spellSaveDc: monster.spellSaveDc || "",
+      spellAttackBonus: monster.spellAttackBonus || "",
+      speed: monster.speed || "",
+      senses: monster.senses || "",
+      languages: monster.languages || "",
+      traits: (monster.traits || []).join(String.fromCharCode(10)),
+      tactics: (monster.tactics || []).join(String.fromCharCode(10)),
+      loot: (monster.loot || []).join(String.fromCharCode(10)),
+    });
+  };
+
+  const saveMonsterEditor = () => {
+    if (!monsterEditor.name.trim()) {
+      addLog("❌ Monster name required.");
+      return;
+    }
+
+    const updatedMonster = normalizeMonster({
+      name: monsterEditor.name.trim(),
+      hp: Number(monsterEditor.hp || 1),
+      maxHp: Number(monsterEditor.hp || 1),
+      ac: Number(monsterEditor.ac || 10),
+      init: Number(monsterEditor.init || 0),
+      xp: Number(monsterEditor.xp || 0),
+      attackBonus: Number(monsterEditor.attackBonus || 0),
+      spellSaveDc: Number(monsterEditor.spellSaveDc || 10),
+      spellAttackBonus: Number(monsterEditor.spellAttackBonus || 0),
+      speed: monsterEditor.speed,
+      senses: monsterEditor.senses,
+      languages: monsterEditor.languages,
+      traits: monsterEditor.traits
+        .split(String.fromCharCode(10))
+        .map((v) => v.trim())
+        .filter(Boolean),
+      tactics: monsterEditor.tactics
+        .split(String.fromCharCode(10))
+        .map((v) => v.trim())
+        .filter(Boolean),
+      loot: monsterEditor.loot
+        .split(String.fromCharCode(10))
+        .map((v) => v.trim())
+        .filter(Boolean),
+    });
+
+    setMonsterLibrary((prev) => {
+      const existingIndex = prev.findIndex(
+        (entry) => entry.name.toLowerCase() === selectedLibraryMonster?.toLowerCase()
+      );
+
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = { ...updatedMonster, id: undefined };
+        return updated;
+      }
+
+      return [...prev, { ...updatedMonster, id: undefined }];
+    });
+
+    setSelectedLibraryMonster(updatedMonster.name);
+    addLog(`💾 Monster updated: ${updatedMonster.name}.`);
+  };
+
+  const saveMonsterAsNew = () => {
+    if (!monsterEditor.name.trim()) {
+      addLog("❌ Monster name required.");
+      return;
+    }
+
+    const exists = monsterLibrary.some(
+      (entry) => entry.name.toLowerCase() === monsterEditor.name.trim().toLowerCase()
+    );
+
+    if (exists) {
+      addLog("❌ Monster already exists. Rename before Save As New.");
+      return;
+    }
+
+    const newMonster = normalizeMonster({
+      name: monsterEditor.name.trim(),
+      hp: Number(monsterEditor.hp || 1),
+      maxHp: Number(monsterEditor.hp || 1),
+      ac: Number(monsterEditor.ac || 10),
+      init: Number(monsterEditor.init || 0),
+      xp: Number(monsterEditor.xp || 0),
+      attackBonus: Number(monsterEditor.attackBonus || 0),
+      spellSaveDc: Number(monsterEditor.spellSaveDc || 10),
+      spellAttackBonus: Number(monsterEditor.spellAttackBonus || 0),
+      speed: monsterEditor.speed,
+      senses: monsterEditor.senses,
+      languages: monsterEditor.languages,
+      traits: monsterEditor.traits.split(String.fromCharCode(10)).map((v) => v.trim()).filter(Boolean),
+      tactics: monsterEditor.tactics.split(String.fromCharCode(10)).map((v) => v.trim()).filter(Boolean),
+      loot: monsterEditor.loot.split(String.fromCharCode(10)).map((v) => v.trim()).filter(Boolean),
+    });
+
+    setMonsterLibrary((prev) => [...prev, { ...newMonster, id: undefined }]);
+    addLog(`📚 Saved new monster: ${newMonster.name}.`);
   };
 
   const deleteMonsterFromLibrary = (name) => {
@@ -1021,13 +1147,13 @@ export default function App() {
         const cond = p.conditions.length ? ` | ${p.conditions.join(", ")}` : "";
         return `${p.name}: ${p.hp}/${p.maxHp} HP | AC ${p.ac} | Init ${p.init}${cond}`;
       })
-      .join("\n");
+      .join(String.fromCharCode(10));
     const enemyText = enemies.length
-      ? enemies.map((e) => `${e.name}: ${e.hp}/${e.maxHp} HP | AC ${e.ac} | Init ${e.init}`).join("\n")
+      ? enemies.map((e) => `${e.name}: ${e.hp}/${e.maxHp} HP | AC ${e.ac} | Init ${e.init}`).join(String.fromCharCode(10))
       : "None";
     const initiativeText = initiative
       .map((c, idx) => `${idx === turnIndex ? "▶ " : ""}${c.init} — ${c.name} (${c.type})`)
-      .join("\n");
+      .join(String.fromCharCode(10));
     return `📊 **SESSION SNAPSHOT**
 
 🎯 **Combat**
@@ -1278,6 +1404,11 @@ Earth Node Progress: ${nodeProgress}%`;
             setMonsterSearch={setMonsterSearch}
             addMonsterFromLibrary={addMonsterFromLibrary}
             deleteMonsterFromLibrary={deleteMonsterFromLibrary}
+            openMonsterEditor={openMonsterEditor}
+            monsterEditor={monsterEditor}
+            setMonsterEditor={setMonsterEditor}
+            saveMonsterEditor={saveMonsterEditor}
+            saveMonsterAsNew={saveMonsterAsNew}
             exportMonsterLibrary={exportMonsterLibrary}
             importMonsterLibrary={importMonsterLibrary}
           />
@@ -1311,7 +1442,42 @@ Earth Node Progress: ${nodeProgress}%`;
         <div style={bottomStyle}>
           <Panel title="Log">
             <div style={logBoxStyle}>{log.length === 0 ? <p>No actions yet.</p> : log.map((l, i) => <div key={i}>• {l}</div>)}</div>
-          </Panel>
+
+      <div style={monsterEditorPanelStyle}>
+        <h3 style={subHeaderStyle}>Monster Editor</h3>
+
+        <input style={inputStyle} placeholder="Name" value={monsterEditor.name} onChange={(e) => setMonsterEditor({ ...monsterEditor, name: e.target.value })} />
+
+        <div style={miniGridStyle}>
+          <input style={inputStyle} placeholder="HP" value={monsterEditor.hp} onChange={(e) => setMonsterEditor({ ...monsterEditor, hp: e.target.value })} />
+          <input style={inputStyle} placeholder="AC" value={monsterEditor.ac} onChange={(e) => setMonsterEditor({ ...monsterEditor, ac: e.target.value })} />
+          <input style={inputStyle} placeholder="Init" value={monsterEditor.init} onChange={(e) => setMonsterEditor({ ...monsterEditor, init: e.target.value })} />
+          <input style={inputStyle} placeholder="XP" value={monsterEditor.xp} onChange={(e) => setMonsterEditor({ ...monsterEditor, xp: e.target.value })} />
+        </div>
+
+        <div style={miniGridStyle}>
+          <input style={inputStyle} placeholder="Attack Bonus" value={monsterEditor.attackBonus} onChange={(e) => setMonsterEditor({ ...monsterEditor, attackBonus: e.target.value })} />
+          <input style={inputStyle} placeholder="Spell Save DC" value={monsterEditor.spellSaveDc} onChange={(e) => setMonsterEditor({ ...monsterEditor, spellSaveDc: e.target.value })} />
+          <input style={inputStyle} placeholder="Spell Attack Bonus" value={monsterEditor.spellAttackBonus} onChange={(e) => setMonsterEditor({ ...monsterEditor, spellAttackBonus: e.target.value })} />
+          <input style={inputStyle} placeholder="Speed" value={monsterEditor.speed} onChange={(e) => setMonsterEditor({ ...monsterEditor, speed: e.target.value })} />
+        </div>
+
+        <input style={inputStyle} placeholder="Senses" value={monsterEditor.senses} onChange={(e) => setMonsterEditor({ ...monsterEditor, senses: e.target.value })} />
+
+        <input style={inputStyle} placeholder="Languages" value={monsterEditor.languages} onChange={(e) => setMonsterEditor({ ...monsterEditor, languages: e.target.value })} />
+
+        <textarea style={textAreaStyle} placeholder="Traits (one per line)" value={monsterEditor.traits} onChange={(e) => setMonsterEditor({ ...monsterEditor, traits: e.target.value })} />
+
+        <textarea style={textAreaStyle} placeholder="Tactics (one per line)" value={monsterEditor.tactics} onChange={(e) => setMonsterEditor({ ...monsterEditor, tactics: e.target.value })} />
+
+        <textarea style={textAreaStyle} placeholder="Loot (one per line)" value={monsterEditor.loot} onChange={(e) => setMonsterEditor({ ...monsterEditor, loot: e.target.value })} />
+
+        <div style={buttonWrapStyle}>
+          <button style={buttonStyle} onClick={saveMonsterEditor}>💾 Save Monster</button>
+          <button style={buttonStyle} onClick={saveMonsterAsNew}>📚 Save As New</button>
+        </div>
+      </div>
+    </Panel>
         </div>
       </main>
     </div>
@@ -1535,7 +1701,7 @@ function PartyPanel({ party, updatePartyField, updatePartyHp, toggleCondition })
   );
 }
 
-function MonsterLibraryPanel({ monsterLibrary, monsterSearch, setMonsterSearch, addMonsterFromLibrary, deleteMonsterFromLibrary, exportMonsterLibrary, importMonsterLibrary }) {
+function MonsterLibraryPanel({ monsterLibrary, monsterSearch, setMonsterSearch, addMonsterFromLibrary, deleteMonsterFromLibrary, exportMonsterLibrary, importMonsterLibrary, openMonsterEditor, monsterEditor, setMonsterEditor, saveMonsterEditor, saveMonsterAsNew }) {
   const query = monsterSearch.trim().toLowerCase();
   const filteredMonsters = monsterLibrary.filter((monster) =>
     monster.name.toLowerCase().includes(query)
@@ -1581,6 +1747,9 @@ function MonsterLibraryPanel({ monsterLibrary, monsterSearch, setMonsterSearch, 
               </div>
               <button style={smallButtonStyle} onClick={() => addMonsterFromLibrary(monster)}>
                 Add to Encounter
+              </button>
+              <button style={smallButtonStyle} onClick={() => openMonsterEditor(monster)}>
+                ✏️ Edit
               </button>
               <button style={dangerButtonStyle} onClick={() => deleteMonsterFromLibrary(monster.name)}>
                 Delete
@@ -1689,6 +1858,7 @@ const stickyTurnBarStyle = { position: "sticky", bottom: 0, background: "#0d1117
 const textAreaStyle = { width: "100%", minHeight: 120, padding: 10, marginBottom: 8, background: "#111827", color: "#e5e7eb", border: "1px solid #3b4351", borderRadius: 6, boxSizing: "border-box", fontSize: 14 };
 const encounterListStyle = { marginTop: 10, maxHeight: 260, overflowY: "auto" };
 const monsterLibraryListStyle = { marginTop: 10, maxHeight: 320, overflowY: "auto" };
+const monsterEditorPanelStyle = { marginTop: 14, paddingTop: 12, borderTop: "1px solid #374151" };
 const logBoxStyle = { maxHeight: 135, overflowY: "auto", fontSize: 13 };
 const linkButtonStyle = { display: "inline-block", textDecoration: "none", color: "#fff", background: "linear-gradient(180deg, #4b5563 0%, #252b34 100%)", border: "1px solid #6b7280", borderRadius: 6, padding: "10px 14px", fontWeight: "bold" };
 const miniGridStyle = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 6 };
