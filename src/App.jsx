@@ -816,6 +816,29 @@ export default function App() {
     setEditingActionIndex(null);
   };
 
+  const saveMonsterToLibrary = (monster) => {
+    const cleanedMonster = {
+      ...monster,
+      id: undefined,
+    };
+
+    setMonsterLibrary((prev) => {
+      const existingIndex = prev.findIndex(
+        (entry) => entry.name.toLowerCase() === monster.name.toLowerCase()
+      );
+
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = cleanedMonster;
+        addLog(`💾 Updated Monster Library entry: ${monster.name}.`);
+        return updated;
+      }
+
+      addLog(`💾 Saved new monster to library: ${monster.name}.`);
+      return [...prev, cleanedMonster];
+    });
+  };
+
   const addNpc = () => {
     if (!npcForm.name.trim()) return;
     const npc = { id: Date.now(), ...npcForm, name: npcForm.name.trim() };
@@ -1183,6 +1206,7 @@ Earth Node Progress: ${nodeProgress}%`;
             actionEditor={actionEditor}
             setActionEditor={setActionEditor}
             saveEditedAction={saveEditedAction}
+            saveMonsterToLibrary={saveMonsterToLibrary}
             selectedActionInfo={selectedActionInfo}
             defeatedEnemies={defeatedEnemies}
             enemies={enemies}
@@ -1264,7 +1288,7 @@ function WorldClockPanel({ calendar, advanceTime }) {
   );
 }
 
-function CombatDirectorPanel({ round, active, initiative, turnIndex, nextTurn, resetCombat, loadCultAmbush, recordMonsterAction, startEditingAction, editingMonsterId, editingActionIndex, actionEditor, setActionEditor, saveEditedAction, selectedActionInfo, defeatedEnemies, enemies, endEncounter, encounterSummary, postEncounterSummary, postEncounterLoot }) {
+function CombatDirectorPanel({ round, active, initiative, turnIndex, nextTurn, resetCombat, loadCultAmbush, recordMonsterAction, startEditingAction, editingMonsterId, editingActionIndex, actionEditor, setActionEditor, saveEditedAction, saveMonsterToLibrary, selectedActionInfo, defeatedEnemies, enemies, endEncounter, encounterSummary, postEncounterSummary, postEncounterLoot }) {
   const currentMonster = active?.type === "Enemy" ? active : null;
   const allEnemiesDefeated = enemies.length === 0 && defeatedEnemies.length > 0;
 
@@ -1367,6 +1391,7 @@ function CombatDirectorPanel({ round, active, initiative, turnIndex, nextTurn, r
               <textarea style={textAreaStyle} placeholder="Tactics" value={actionEditor.tactics} onChange={(e) => setActionEditor({ ...actionEditor, tactics: e.target.value })} />
 
               <button style={buttonStyle} onClick={saveEditedAction}>💾 Save Action</button>
+              <button style={buttonStyle} onClick={() => saveMonsterToLibrary(currentMonster)}>📚 Save Monster to Library</button>
             </div>
           )}
 
