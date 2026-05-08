@@ -1235,6 +1235,43 @@ function CombatDirectorPanel({ round, active, initiative, turnIndex, nextTurn, r
             })}
           </div>
 
+          <div style={monsterStatCardStyle}>
+            <h4 style={subHeaderStyle}>{currentMonster.name}</h4>
+            <div><strong>AC:</strong> {currentMonster.ac} | <strong>HP:</strong> {currentMonster.hp}/{currentMonster.maxHp}</div>
+            <div><strong>Speed:</strong> {currentMonster.speed || "30 ft."}</div>
+            <div>
+              <strong>Attack:</strong> +{currentMonster.attackBonus || 3} |
+              <strong> Spell DC:</strong> {currentMonster.spellSaveDc || 12} |
+              <strong> Spell Atk:</strong> +{currentMonster.spellAttackBonus || 4}
+            </div>
+            <div style={{ marginTop: 6 }}>
+              <strong>Abilities:</strong>
+              <div>
+                STR {currentMonster.abilities?.str || 10} | DEX {currentMonster.abilities?.dex || 10} | CON {currentMonster.abilities?.con || 10}
+              </div>
+              <div>
+                INT {currentMonster.abilities?.int || 10} | WIS {currentMonster.abilities?.wis || 10} | CHA {currentMonster.abilities?.cha || 10}
+              </div>
+            </div>
+            <div style={{ marginTop: 6 }}>
+              <strong>Senses:</strong> {currentMonster.senses || "passive Perception 10"}
+            </div>
+            <div>
+              <strong>Languages:</strong> {currentMonster.languages || "—"}
+            </div>
+
+            {(currentMonster.traits || []).length > 0 && (
+              <div style={{ marginTop: 6 }}>
+                <strong>Traits:</strong>
+                <ul style={{ marginTop: 4 }}>
+                  {currentMonster.traits.map((trait, index) => (
+                    <li key={index}>{trait}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
           {selectedActionInfo && selectedActionInfo.monsterName === currentMonster.name && (
             <div style={actionDetailStyle}>
               <h4 style={subHeaderStyle}>{selectedActionInfo.action}</h4>
@@ -1437,6 +1474,7 @@ const cardStyle = { background: "#0d1117", border: "1px solid #3b4351", borderRa
 const innerCardStyle = { background: "#121821", border: "1px solid #303845", borderRadius: 6, padding: 8, marginBottom: 8 };
 const directorCardStyle = { ...innerCardStyle, background: "#151b25", border: "1px solid #8a6d1d" };
 const actionDetailStyle = { marginTop: 10, padding: 10, background: "#0f172a", border: "1px solid #8a6d1d", borderRadius: 6 };
+const monsterStatCardStyle = { marginTop: 10, padding: 12, background: "#111827", border: "1px solid #4b5563", borderRadius: 6 };
 const panelTitleStyle = { color: "#f2d28b", margin: "0 0 8px", borderBottom: "1px solid #35291a", paddingBottom: 4, textTransform: "uppercase", fontSize: 17 };
 const subHeaderStyle = { color: "#f2d28b", margin: "4px 0 8px" };
 const inputStyle = { width: "100%", padding: 9, marginBottom: 8, background: "#111827", color: "#e5e7eb", border: "1px solid #3b4351", borderRadius: 6, boxSizing: "border-box", fontSize: 14 };
