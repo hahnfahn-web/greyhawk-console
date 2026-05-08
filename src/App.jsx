@@ -1354,6 +1354,19 @@ Earth Node Progress: ${nodeProgress}%`;
       <h1 style={isMobile ? mobileTitleStyle : titleStyle}>Greyhawk Command Console v4</h1>
       <WorkflowBar workflowMode={workflowMode} setWorkflowMode={setWorkflowMode} />
       <WorkflowGuide workflowMode={workflowMode} />
+      <WorkflowQuickActions
+        workflowMode={workflowMode}
+        setWorkflowMode={setWorkflowMode}
+        setSessionPrep={setSessionPrep}
+        buildPrep={buildPrep}
+        loadCultAmbush={loadCultAmbush}
+        advanceTime={advanceTime}
+        endEncounter={endEncounter}
+        postEncounterSummary={postEncounterSummary}
+        postEncounterLoot={postEncounterLoot}
+        saveCampaign={saveCampaign}
+        exportCampaign={exportCampaign}
+      />
       <main style={layoutStyle}>
         <div style={leftStyle}>
           <PartyPanel party={party} updatePartyField={updatePartyField} updatePartyHp={updatePartyHp} toggleCondition={toggleCondition} />
@@ -1555,6 +1568,59 @@ function WorkflowGuide({ workflowMode }) {
           <span key={step} style={workflowGuideStepStyle}>{step}</span>
         ))}
       </div>
+    </div>
+  );
+}
+
+function WorkflowQuickActions({
+  workflowMode,
+  setWorkflowMode,
+  setSessionPrep,
+  buildPrep,
+  loadCultAmbush,
+  advanceTime,
+  endEncounter,
+  postEncounterSummary,
+  postEncounterLoot,
+  saveCampaign,
+  exportCampaign,
+}) {
+  if (workflowMode === "Prep") {
+    return (
+      <div style={quickActionsStyle}>
+        <button style={quickActionButtonStyle} onClick={() => setSessionPrep(buildPrep())}>🕯️ Auto Fill Prep</button>
+        <button style={quickActionButtonStyle} onClick={() => advanceTime(1, 0)}>🕒 Advance 1 Hour</button>
+        <button style={quickActionButtonStyle} onClick={() => setWorkflowMode("Live")}>▶ Begin Live Session</button>
+      </div>
+    );
+  }
+
+  if (workflowMode === "Live") {
+    return (
+      <div style={quickActionsStyle}>
+        <button style={quickActionButtonStyle} onClick={() => advanceTime(0, 10)}>🕯️ Dungeon Turn +10 Min</button>
+        <button style={quickActionButtonStyle} onClick={() => advanceTime(1, 0)}>🕒 +1 Hour</button>
+        <button style={quickActionButtonStyle} onClick={() => setWorkflowMode("Combat")}>⚔️ Enter Combat Mode</button>
+      </div>
+    );
+  }
+
+  if (workflowMode === "Combat") {
+    return (
+      <div style={quickActionsStyle}>
+        <button style={quickActionButtonStyle} onClick={loadCultAmbush}>⚔️ Load Cult Ambush</button>
+        <button style={quickActionButtonStyle} onClick={endEncounter}>🏁 End Encounter</button>
+        <button style={quickActionButtonStyle} onClick={() => setWorkflowMode("After Action")}>📜 After Action</button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={quickActionsStyle}>
+      <button style={quickActionButtonStyle} onClick={postEncounterSummary}>📡 Post Summary</button>
+      <button style={quickActionButtonStyle} onClick={postEncounterLoot}>💰 Post Loot</button>
+      <button style={quickActionButtonStyle} onClick={saveCampaign}>💾 Save Campaign</button>
+      <button style={quickActionButtonStyle} onClick={exportCampaign}>📤 Export Backup</button>
     </div>
   );
 }
@@ -1910,6 +1976,8 @@ const workflowGuideTitleStyle = { color: "#f2d28b", fontWeight: "bold", marginBo
 const workflowGuideTextStyle = { color: "#d1d5db", fontSize: 14, marginBottom: 8 };
 const workflowGuideStepsStyle = { display: "flex", flexWrap: "wrap", gap: 6 };
 const workflowGuideStepStyle = { background: "#1f2937", border: "1px solid #4b5563", borderRadius: 999, padding: "4px 8px", fontSize: 12, color: "#e5e7eb" };
+const quickActionsStyle = { display: "flex", flexWrap: "wrap", gap: 8, background: "#0d1117", border: "1px solid #374151", borderRadius: 8, padding: 10, marginBottom: 12 };
+const quickActionButtonStyle = { background: "linear-gradient(180deg, #4b5563 0%, #252b34 100%)", color: "#f8fafc", border: "1px solid #6b7280", borderRadius: 6, padding: "9px 12px", cursor: "pointer", fontSize: 14 };
 const mobileTitleStyle = { ...titleStyle, fontSize: 36, lineHeight: 1 };
 const hiddenStyle = { display: "none" };
 
