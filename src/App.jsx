@@ -13,6 +13,142 @@ const MONSTER_CONDITIONS = [
   "Invisible", "Concentrating", "Charmed", "Grappled", "Dead",
 ];
 
+const ACTION_DETAILS = {
+  Scimitar: {
+    roll: "Melee Weapon Attack: d20 + attack bonus vs target AC.",
+    effect: "On hit, deal slashing damage. Use this when adjacent to a vulnerable or isolated PC.",
+    note: "Typical cultist attack. Pick a wounded or lightly armored target if possible.",
+  },
+  "Dark Prayer": {
+    roll: "No attack roll by default unless you decide it mimics a cantrip or cult feature.",
+    effect: "Use as a sinister support action: grant advantage to an ally's next attack, call for aid, or intensify cult morale.",
+    note: "Good for atmosphere when the cultist cannot reach a target.",
+  },
+  Dodge: {
+    roll: "No roll. Attacks against the creature have disadvantage until its next turn if it can see the attacker.",
+    effect: "Defensive action. Also gives advantage on Dexterity saving throws.",
+    note: "Use while guarding a doorway, priest, ritual object, or alarm point.",
+  },
+  Disengage: {
+    roll: "No roll.",
+    effect: "Movement does not provoke opportunity attacks for the rest of the turn.",
+    note: "Use to reposition, flee, protect a leader, or reach an alarm gong.",
+  },
+  Retreat: {
+    roll: "Usually no roll unless contested by terrain, grapples, or chase rules.",
+    effect: "Move toward reinforcements, cover, a defensible chokepoint, or escape route.",
+    note: "Best when bloodied, outnumbered, or when the monster has useful information to preserve.",
+  },
+  Mace: {
+    roll: "Melee Weapon Attack: d20 + attack bonus vs target AC.",
+    effect: "On hit, deal bludgeoning damage.",
+    note: "Use when the caster/priest is cornered or conserving spells.",
+  },
+  "Sacred Flame": {
+    roll: "Target makes a Dexterity saving throw vs the caster's spell save DC.",
+    effect: "On failed save, target takes radiant damage. No effect on a successful save.",
+    note: "Good against high-AC targets because it uses a saving throw instead of an attack roll.",
+  },
+  Bless: {
+    roll: "No attack roll. Concentration spell.",
+    effect: "Up to three allies add 1d4 to attack rolls and saving throws while the spell lasts.",
+    note: "Best in round 1 if several allies are alive. Mark the caster as Concentrating.",
+  },
+  Command: {
+    roll: "Target makes a Wisdom saving throw vs spell save DC.",
+    effect: "On failed save, target follows a one-word command on its next turn if the command is not directly harmful.",
+    note: "Strong options: Drop, Flee, Grovel, Halt, Approach.",
+  },
+  Bite: {
+    roll: "Melee Weapon Attack: d20 + attack bonus vs target AC.",
+    effect: "On hit, deal piercing damage.",
+    note: "Gnolls favor wounded prey and isolated targets.",
+  },
+  Spear: {
+    roll: "Melee or Ranged Weapon Attack: d20 + attack bonus vs target AC.",
+    effect: "On hit, deal piercing damage.",
+    note: "Use thrown spear if the gnoll cannot reach the target this turn.",
+  },
+  Rampage: {
+    roll: "Triggered after reducing a creature to 0 HP with a melee attack on its turn.",
+    effect: "The gnoll can move up to half its speed and make a bite attack as a bonus action.",
+    note: "Use immediately if available; it makes gnolls feel savage and dangerous.",
+  },
+  Dash: {
+    roll: "No roll.",
+    effect: "Gain extra movement equal to speed for the turn.",
+    note: "Use to close distance, flee, reach cover, or surround a weak target.",
+  },
+  Glaive: {
+    roll: "Melee Weapon Attack: d20 + attack bonus vs target AC, usually reach 10 ft if using a glaive profile.",
+    effect: "On hit, deal slashing damage.",
+    note: "Good for controlling space and striking from behind allies.",
+  },
+  "Incite Rampage": {
+    roll: "No standard 5E roll unless you assign a morale check.",
+    effect: "Use as a commander action: order nearby gnolls to focus a wounded PC or press the attack.",
+    note: "Great for pack leaders; reinforces brutal pack tactics.",
+  },
+  Threaten: {
+    roll: "Optional Charisma (Intimidation) check contested by Wisdom (Insight) or set a DC.",
+    effect: "Demoralize, delay, demand surrender, or force hesitation narratively.",
+    note: "Use when the leader wants captives or to buy time.",
+  },
+  Warhammer: {
+    roll: "Melee Weapon Attack: d20 + attack bonus vs target AC.",
+    effect: "On hit, deal bludgeoning damage.",
+    note: "Earth guards prefer steady, disciplined attacks in chokepoints.",
+  },
+  "Shield Bash": {
+    roll: "Use an opposed Strength (Athletics) check or target Strength/Dexterity saving throw, DM choice.",
+    effect: "On success, shove the target 5 ft or knock it prone.",
+    note: "Use to break formations, push PCs into hazards, or protect a priest.",
+  },
+  "Guard Priest": {
+    roll: "No roll.",
+    effect: "Move to block access, impose tactical pressure, or use Help/Dodge to protect the priest.",
+    note: "Best if the Earth Priest is concentrating or bloodied.",
+  },
+  "Hold Person": {
+    roll: "Humanoid target makes a Wisdom saving throw vs spell save DC.",
+    effect: "On failed save, target is paralyzed. Repeat save at end of each of its turns.",
+    note: "Very strong against melee threats. Remember: attacks within 5 ft against paralyzed targets are critical hits if they hit.",
+  },
+  "Spiritual Weapon": {
+    roll: "Melee Spell Attack: d20 + spell attack bonus vs target AC.",
+    effect: "On hit, deal force damage. Usually bonus action to cast and bonus action to move/attack on later turns.",
+    note: "Excellent because it does not require concentration in 2014 5E.",
+  },
+  "Cure Wounds": {
+    roll: "Healing roll based on spell slot and spellcasting modifier.",
+    effect: "Restore HP to a touched ally or self.",
+    note: "Use if it keeps a leader or key defender alive. Avoid wasting it on doomed minions.",
+  },
+  "Command Retreat": {
+    roll: "No roll unless morale is contested.",
+    effect: "Order allies to fall back, regroup, raise alarm, or protect the ritual area.",
+    note: "Use when the fight is turning against the cult.",
+  },
+  Attack: {
+    roll: "Attack roll: d20 + attack bonus vs target AC.",
+    effect: "On hit, deal the monster's normal weapon or natural attack damage.",
+    note: "Default option when no special action applies.",
+  },
+  Flee: {
+    roll: "No roll unless chase, difficult terrain, or grappling applies.",
+    effect: "The creature prioritizes survival or warning allies.",
+    note: "Use for intelligent enemies who are bloodied, isolated, or outmatched.",
+  },
+};
+
+function getActionDetails(action) {
+  return ACTION_DETAILS[action] || {
+    roll: "Use the most appropriate 2014 5E roll: attack roll, saving throw, ability check, or no roll if purely tactical.",
+    effect: "Resolve based on the monster's stat block or your encounter notes.",
+    note: "Use this action if it fits the creature's instincts, orders, and battlefield position.",
+  };
+}
+
 const DEFAULT_ENCOUNTERS = [
   {
     name: "Cult Ambush",
@@ -245,6 +381,7 @@ export default function App() {
   const [turnIndex, setTurnIndex] = useState(() => loadSaved("turnIndex", 0));
   const [activeEncounterName, setActiveEncounterName] = useState(() => loadSaved("activeEncounterName", "Current Encounter"));
   const [encounterSummary, setEncounterSummary] = useState(() => loadSaved("encounterSummary", ""));
+  const [selectedActionInfo, setSelectedActionInfo] = useState(() => loadSaved("selectedActionInfo", null));
 
   const [npcs, setNpcs] = useState(() => loadSaved("npcs", []));
   const [npcForm, setNpcForm] = useState({
@@ -276,6 +413,7 @@ export default function App() {
   useEffect(() => localStorage.setItem("turnIndex", JSON.stringify(turnIndex)), [turnIndex]);
   useEffect(() => localStorage.setItem("activeEncounterName", JSON.stringify(activeEncounterName)), [activeEncounterName]);
   useEffect(() => localStorage.setItem("encounterSummary", JSON.stringify(encounterSummary)), [encounterSummary]);
+  useEffect(() => localStorage.setItem("selectedActionInfo", JSON.stringify(selectedActionInfo)), [selectedActionInfo]);
   useEffect(() => localStorage.setItem("npcs", JSON.stringify(npcs)), [npcs]);
   useEffect(() => localStorage.setItem("sessionPrep", JSON.stringify(sessionPrep)), [sessionPrep]);
   useEffect(() => localStorage.setItem("savedEncounters", JSON.stringify(savedEncounters)), [savedEncounters]);
@@ -439,7 +577,9 @@ export default function App() {
   };
 
   const recordMonsterAction = (monsterName, action) => {
-    addLog(`🎲 ${monsterName} uses ${action}.`);
+    const details = getActionDetails(action);
+    setSelectedActionInfo({ monsterName, action, ...details });
+    addLog(`🎲 ${monsterName} considers ${action}.`);
   };
 
   const addNpc = () => {
@@ -801,6 +941,7 @@ Earth Node Progress: ${nodeProgress}%`;
             resetCombat={resetCombat}
             loadCultAmbush={loadCultAmbush}
             recordMonsterAction={recordMonsterAction}
+            selectedActionInfo={selectedActionInfo}
             defeatedEnemies={defeatedEnemies}
             enemies={enemies}
             endEncounter={endEncounter}
@@ -874,7 +1015,7 @@ function WorldClockPanel({ calendar, advanceTime }) {
   );
 }
 
-function CombatDirectorPanel({ round, active, initiative, turnIndex, nextTurn, resetCombat, loadCultAmbush, recordMonsterAction, defeatedEnemies, enemies, endEncounter, encounterSummary, postEncounterSummary, postEncounterLoot }) {
+function CombatDirectorPanel({ round, active, initiative, turnIndex, nextTurn, resetCombat, loadCultAmbush, recordMonsterAction, selectedActionInfo, defeatedEnemies, enemies, endEncounter, encounterSummary, postEncounterSummary, postEncounterLoot }) {
   const currentMonster = active?.type === "Enemy" ? active : null;
   const allEnemiesDefeated = enemies.length === 0 && defeatedEnemies.length > 0;
 
@@ -901,6 +1042,15 @@ function CombatDirectorPanel({ round, active, initiative, turnIndex, nextTurn, r
               <button key={action} style={buttonStyle} onClick={() => recordMonsterAction(currentMonster.name, action)}>{action}</button>
             ))}
           </div>
+
+          {selectedActionInfo && selectedActionInfo.monsterName === currentMonster.name && (
+            <div style={actionDetailStyle}>
+              <h4 style={subHeaderStyle}>{selectedActionInfo.action}</h4>
+              <div><strong>Roll Needed:</strong> {selectedActionInfo.roll}</div>
+              <div style={{ marginTop: 6 }}><strong>Effect:</strong> {selectedActionInfo.effect}</div>
+              <div style={{ marginTop: 6 }}><strong>Tactical Note:</strong> {selectedActionInfo.note}</div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1051,6 +1201,7 @@ const bottomBarStyle = { gridArea: "bottom", minHeight: 0 };
 const cardStyle = { background: "#0d1117", border: "1px solid #3b4351", borderRadius: 8, padding: 12, boxSizing: "border-box", minWidth: 0 };
 const innerCardStyle = { background: "#121821", border: "1px solid #303845", borderRadius: 6, padding: 8, marginBottom: 8 };
 const directorCardStyle = { ...innerCardStyle, background: "#151b25", border: "1px solid #8a6d1d" };
+const actionDetailStyle = { marginTop: 10, padding: 10, background: "#0f172a", border: "1px solid #8a6d1d", borderRadius: 6 };
 const panelTitleStyle = { color: "#f2d28b", margin: "0 0 8px", borderBottom: "1px solid #35291a", paddingBottom: 4, textTransform: "uppercase", fontSize: 17 };
 const subHeaderStyle = { color: "#f2d28b", margin: "4px 0 8px" };
 const inputStyle = { width: "100%", padding: 9, marginBottom: 8, background: "#111827", color: "#e5e7eb", border: "1px solid #3b4351", borderRadius: 6, boxSizing: "border-box", fontSize: 14 };
