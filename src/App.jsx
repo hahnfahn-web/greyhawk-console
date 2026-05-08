@@ -604,27 +604,52 @@ Earth Node Progress: ${nodeProgress}%`;
   };
 
   const buildEncounterSummary = () => {
-    const defeated = defeatedEnemies;
-    const totalXp = defeated.reduce((sum, e) => sum + Number(e.xp || 0), 0);
+    const NL = String.fromCharCode(10);
+
+    const defeated = defeatedEnemies || [];
+
+    const totalXp = defeated.reduce(
+      (sum, enemy) => sum + Number(enemy.xp || 0),
+      0
+    );
+
     const partyCount = Math.max(party.length, 1);
     const perPlayer = Math.floor(totalXp / partyCount);
-    const loot = defeated.flatMap((e) => e.loot || []);
-    return `## ⚔️ Encounter Complete — ${activeEncounterName || "Current Encounter"}
 
-**Rounds:** ${round}
+    const loot = defeated.flatMap((enemy) => enemy.loot || []);
 
-### Enemies Defeated
-${defeated.length ? defeated.map((e) => `• ${e.name} (${e.xp || 0} XP)`).join("\n") : "None recorded"}
+    const defeatedLines = defeated.length
+      ? defeated
+          .map((enemy) => "• " + enemy.name + " (" + (enemy.xp || 0) + " XP)")
+          .join(NL)
+      : "None recorded";
 
-### XP Awarded
-**Total XP:** ${totalXp}
-**Per Character:** ${perPlayer}
+    const lootLines = loot.length
+      ? loot.map((item) => "• " + item).join(NL)
+      : "No treasure recorded.";
 
-### Treasure / Loot
-${loot.length ? loot.map((item) => `• ${item}`).join("\n") : "No treasure recorded."}
+    const noteLines = log.length
+      ? log.slice(0, 10).map((entry) => "• " + entry).join(NL)
+      : "No combat notes recorded.";
 
-### Combat Notes
-${log.slice(0, 10).map((entry) => `• ${entry}`).join("\n")}`;
+    return [
+      "## ⚔️ Encounter Complete — " + (activeEncounterName || "Current Encounter"),
+      "",
+      "Rounds: " + round,
+      "",
+      "=== Enemies Defeated ===",
+      defeatedLines,
+      "",
+      "=== XP Awarded ===",
+      "Total XP: " + totalXp,
+      "Per Character: " + perPlayer,
+      "",
+      "=== Treasure / Loot ===",
+      lootLines,
+      "",
+      "=== Combat Notes ===",
+      noteLines,
+    ].join(NL);
   };
 
   const endEncounter = () => {
@@ -635,7 +660,25 @@ ${log.slice(0, 10).map((entry) => `• ${entry}`).join("\n")}`;
 
   const postEncounterSummary = () => {
     const summary = encounterSummary || buildEncounterSummary();
-    postToDiscord("dm-control-room", summary);
+    postToDiscord(channel, summary);
+    addLog(`📡 Encounter summary posted to #${channel}.`);
+  };
+
+  const postEncounterLoot = () => {
+    const NL = String.fromCharCode(10);
+    const loot = defeatedEnemies.flatMap((e) => e.loot || []);
+    const lootLines = loot.length
+      ? loot.map((item) => "• " + item).join(NL)
+      : "No treasure recorded.";
+
+    const lootMessage = [
+      "## 💰 Treasure / Loot — " + activeEncounterName,
+      "",
+      lootLines,
+    ].join(NL);
+
+    postToDiscord("treasure-loot", lootMessage);
+    addLog("💰 Loot posted to #treasure-loot.");
   };
 
   const saveCampaign = () => {
@@ -763,6 +806,7 @@ ${log.slice(0, 10).map((entry) => `• ${entry}`).join("\n")}`;
             endEncounter={endEncounter}
             encounterSummary={encounterSummary}
             postEncounterSummary={postEncounterSummary}
+            postEncounterLoot={postEncounterLoot}
           />
           <EncounterLibraryPanel encounterName={encounterName} setEncounterName={setEncounterName} saveCurrentEncounter={saveCurrentEncounter} savedEncounters={savedEncounters} loadEncounter={loadEncounter} deleteEncounter={deleteEncounter} />
         </div>
@@ -830,7 +874,7 @@ function WorldClockPanel({ calendar, advanceTime }) {
   );
 }
 
-function CombatDirectorPanel({ round, active, initiative, turnIndex, nextTurn, resetCombat, loadCultAmbush, recordMonsterAction, defeatedEnemies, enemies, endEncounter, encounterSummary, postEncounterSummary }) {
+function CombatDirectorPanel({ round, active, initiative, turnIndex, nextTurn, resetCombat, loadCultAmbush, recordMonsterAction, defeatedEnemies, enemies, endEncounter, encounterSummary, postEncounterSummary, postEncounterLoot }) {
   const currentMonster = active?.type === "Enemy" ? active : null;
   const allEnemiesDefeated = enemies.length === 0 && defeatedEnemies.length > 0;
 
@@ -877,6 +921,7 @@ function CombatDirectorPanel({ round, active, initiative, turnIndex, nextTurn, r
       <div style={{ marginTop: 12 }}>
         <button style={allEnemiesDefeated ? buttonStyle : disabledButtonStyle} onClick={endEncounter} disabled={!allEnemiesDefeated}>⚔️ End Encounter</button>
         <button style={encounterSummary ? buttonStyle : disabledButtonStyle} onClick={postEncounterSummary} disabled={!encounterSummary}>Post Summary</button>
+        <button style={encounterSummary ? buttonStyle : disabledButtonStyle} onClick={postEncounterLoot} disabled={!encounterSummary}>💰 Post Loot</button>
       </div>
 
       {encounterSummary && <textarea style={{ ...textAreaStyle, minHeight: 220 }} value={encounterSummary} readOnly />}
