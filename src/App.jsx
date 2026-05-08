@@ -476,6 +476,7 @@ export default function App() {
   const [apiKey, setApiKey] = useState(() => loadSaved("apiKey", ""));
   const [channel, setChannel] = useState(() => loadSaved("channel", "dm-control-room"));
   const [customMsg, setCustomMsg] = useState("");
+  const [workflowMode, setWorkflowMode] = useState(() => loadSaved("workflowMode", "Live"));
 
   const [calendar, setCalendar] = useState(() =>
     loadSaved("calendar", {
@@ -564,6 +565,7 @@ export default function App() {
   useEffect(() => localStorage.setItem("bridgeUrl", JSON.stringify(bridgeUrl)), [bridgeUrl]);
   useEffect(() => localStorage.setItem("apiKey", JSON.stringify(apiKey)), [apiKey]);
   useEffect(() => localStorage.setItem("channel", JSON.stringify(channel)), [channel]);
+  useEffect(() => localStorage.setItem("workflowMode", JSON.stringify(workflowMode)), [workflowMode]);
   useEffect(() => localStorage.setItem("calendar", JSON.stringify(calendar)), [calendar]);
   useEffect(() => localStorage.setItem("earthCult", JSON.stringify(earthCult)), [earthCult]);
   useEffect(() => localStorage.setItem("dungeonAlert", JSON.stringify(dungeonAlert)), [dungeonAlert]);
@@ -1342,7 +1344,8 @@ Earth Node Progress: ${nodeProgress}%`;
 
   return (
     <div style={pageStyle}>
-      <h1 style={isMobile ? mobileTitleStyle : titleStyle}>Greyhawk Command Console v3</h1>
+      <h1 style={isMobile ? mobileTitleStyle : titleStyle}>Greyhawk Command Console v4</h1>
+      <WorkflowBar workflowMode={workflowMode} setWorkflowMode={setWorkflowMode} />
       <main style={layoutStyle}>
         <div style={leftStyle}>
           <PartyPanel party={party} updatePartyField={updatePartyField} updatePartyHp={updatePartyHp} toggleCondition={toggleCondition} />
@@ -1480,6 +1483,31 @@ Earth Node Progress: ${nodeProgress}%`;
     </Panel>
         </div>
       </main>
+    </div>
+  );
+}
+
+function WorkflowBar({ workflowMode, setWorkflowMode }) {
+  const modes = ["Prep", "Live", "Combat", "After Action"];
+
+  return (
+    <div style={workflowBarStyle}>
+      <div style={workflowLabelStyle}>DM Workflow Mode</div>
+      <div style={workflowButtonWrapStyle}>
+        {modes.map((mode) => {
+          const active = workflowMode === mode;
+          return (
+            <button
+              key={mode}
+              style={active ? workflowButtonActiveStyle : workflowButtonStyle}
+              onClick={() => setWorkflowMode(mode)}
+            >
+              {mode}
+            </button>
+          );
+        })}
+      </div>
+      <div style={workflowStatusStyle}>Current Mode: {workflowMode}</div>
     </div>
   );
 }
@@ -1823,7 +1851,13 @@ function NpcPanel({ npcs, npcForm, setNpcForm, addNpc, removeNpc }) {
 }
 
 const pageStyle = { minHeight: "100vh", width: "100vw", maxWidth: "100vw", overflowX: "hidden", background: "radial-gradient(circle at top,#202733,#0b0f14)", color: "#e5e7eb", fontFamily: "Georgia, 'Times New Roman', serif", padding: 12, boxSizing: "border-box" };
-const titleStyle = { textAlign: "center", color: "#f2d28b", margin: "8px 0 14px" };
+const titleStyle = { textAlign: "center", color: "#f2d28b", margin: "8px 0 10px" };
+const workflowBarStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", background: "#0d1117", border: "1px solid #3b4351", borderRadius: 8, padding: 10, marginBottom: 12 };
+const workflowLabelStyle = { color: "#f2d28b", fontWeight: "bold", textTransform: "uppercase", letterSpacing: 1 };
+const workflowButtonWrapStyle = { display: "flex", flexWrap: "wrap", gap: 6 };
+const workflowButtonStyle = { background: "linear-gradient(180deg, #374151 0%, #1f2937 100%)", color: "#e5e7eb", border: "1px solid #4b5563", borderRadius: 6, padding: "9px 12px", cursor: "pointer", fontSize: 14 };
+const workflowButtonActiveStyle = { ...workflowButtonStyle, background: "linear-gradient(180deg, #8a6d1d 0%, #4a3415 100%)", color: "#fff2b8", border: "1px solid #d6a03d", boxShadow: "0 0 10px rgba(214,160,61,0.35)" };
+const workflowStatusStyle = { color: "#cbd5e1", fontSize: 13 };
 const mobileTitleStyle = { ...titleStyle, fontSize: 36, lineHeight: 1 };
 const desktopGridStyle = { display: "grid", gridTemplateColumns: "minmax(360px, 440px) minmax(620px, 1fr) minmax(360px, 440px)", gridTemplateRows: "auto 1fr 180px", gridTemplateAreas: `"left top right" "left center right" "bottom bottom bottom"`, gap: 12, width: "100%", maxWidth: "100%", minHeight: "calc(100vh - 80px)" };
 const mobileGridStyle = { display: "grid", gridTemplateColumns: "1fr", gap: 12 };
