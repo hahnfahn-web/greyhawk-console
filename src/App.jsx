@@ -149,6 +149,75 @@ function getActionDetails(action) {
   };
 }
 
+const DEFAULT_MONSTER_LIBRARY = [
+  {
+    name: "Cultist Acolyte",
+    hp: 9,
+    maxHp: 9,
+    ac: 12,
+    init: 10,
+    xp: 25,
+    actions: ["Scimitar", "Dark Prayer", "Dodge", "Disengage"],
+    tactics: ["Swarm isolated targets.", "Protect the adept.", "Flee if alone and bloodied."],
+    loot: ["1d6 sp", "earth cult token"],
+  },
+  {
+    name: "Dark Adept",
+    hp: 22,
+    maxHp: 22,
+    ac: 13,
+    init: 14,
+    xp: 100,
+    actions: ["Mace", "Sacred Flame", "Bless", "Command", "Retreat"],
+    tactics: ["Open with Bless if allies remain.", "Target wounded or isolated PCs.", "Retreat toward reinforcements when bloodied."],
+    loot: ["ritual dagger", "black earth charm", "12 sp"],
+  },
+  {
+    name: "Gnoll",
+    hp: 22,
+    maxHp: 22,
+    ac: 15,
+    init: 11,
+    xp: 100,
+    actions: ["Bite", "Spear", "Rampage", "Dash"],
+    tactics: ["Flank with allies.", "Attack wounded targets.", "Retreat if pack lord dies."],
+    loot: ["crude spear", "3d6 cp"],
+  },
+  {
+    name: "Gnoll Pack Lord",
+    hp: 49,
+    maxHp: 49,
+    ac: 15,
+    init: 15,
+    xp: 450,
+    actions: ["Glaive", "Bite", "Incite Rampage", "Threaten", "Retreat"],
+    tactics: ["Lead from the front.", "Focus the strongest-looking warrior.", "Use allies to surround spellcasters."],
+    loot: ["iron torc", "bloody battle standard", "2d10 sp"],
+  },
+  {
+    name: "Earth Guard",
+    hp: 45,
+    maxHp: 45,
+    ac: 16,
+    init: 10,
+    xp: 200,
+    actions: ["Warhammer", "Shield Bash", "Guard Priest", "Dodge"],
+    tactics: ["Hold chokepoints.", "Protect the priest.", "Do not pursue far from assigned post."],
+    loot: ["heavy shield", "earth temple tabard"],
+  },
+  {
+    name: "Earth Priest",
+    hp: 60,
+    maxHp: 60,
+    ac: 14,
+    init: 12,
+    xp: 450,
+    actions: ["Mace", "Hold Person", "Spiritual Weapon", "Cure Wounds", "Command Retreat"],
+    tactics: ["Disable dangerous melee attackers.", "Use guards as cover.", "Heal only if it preserves command of the fight."],
+    loot: ["obsidian holy symbol", "scroll fragment", "25 sp"],
+  },
+];
+
 const DEFAULT_ENCOUNTERS = [
   {
     name: "Cult Ambush",
@@ -376,6 +445,8 @@ export default function App() {
   const [enemies, setEnemies] = useState(() => loadSaved("enemies", []));
   const [defeatedEnemies, setDefeatedEnemies] = useState(() => loadSaved("defeatedEnemies", []));
   const [enemyForm, setEnemyForm] = useState({ name: "", hp: "", ac: "", init: "", xp: "" });
+  const [monsterLibrary, setMonsterLibrary] = useState(() => loadSaved("monsterLibrary", DEFAULT_MONSTER_LIBRARY));
+  const [monsterSearch, setMonsterSearch] = useState("");
 
   const [round, setRound] = useState(() => loadSaved("round", 1));
   const [turnIndex, setTurnIndex] = useState(() => loadSaved("turnIndex", 0));
@@ -409,6 +480,7 @@ export default function App() {
   useEffect(() => localStorage.setItem("party", JSON.stringify(party)), [party]);
   useEffect(() => localStorage.setItem("enemies", JSON.stringify(enemies)), [enemies]);
   useEffect(() => localStorage.setItem("defeatedEnemies", JSON.stringify(defeatedEnemies)), [defeatedEnemies]);
+  useEffect(() => localStorage.setItem("monsterLibrary", JSON.stringify(monsterLibrary)), [monsterLibrary]);
   useEffect(() => localStorage.setItem("round", JSON.stringify(round)), [round]);
   useEffect(() => localStorage.setItem("turnIndex", JSON.stringify(turnIndex)), [turnIndex]);
   useEffect(() => localStorage.setItem("activeEncounterName", JSON.stringify(activeEncounterName)), [activeEncounterName]);
@@ -433,6 +505,7 @@ export default function App() {
     party,
     enemies,
     defeatedEnemies,
+    monsterLibrary,
     turnIndex,
     round,
     activeEncounterName,
@@ -452,7 +525,7 @@ export default function App() {
       localStorage.setItem("greyhawkCampaignAutosave", JSON.stringify(getCampaignState()));
     }, 60000);
     return () => clearInterval(interval);
-  }, [party, enemies, defeatedEnemies, turnIndex, round, activeEncounterName, encounterSummary, npcs, encounterName, savedEncounters, earthCult, dungeonAlert, nodeProgress, calendar, log]);
+  }, [party, enemies, defeatedEnemies, monsterLibrary, turnIndex, round, activeEncounterName, encounterSummary, npcs, encounterName, savedEncounters, earthCult, dungeonAlert, nodeProgress, calendar, log]);
 
   const postToDiscord = async (target, message) => {
     if (!bridgeUrl || !apiKey) {
@@ -528,6 +601,43 @@ export default function App() {
     setEnemies((prev) => [...prev, enemy]);
     setEnemyForm({ name: "", hp: "", ac: "", init: "", xp: "" });
     addLog(`Enemy added: ${enemy.name}.`);
+  };
+
+  const addMonsterFromLibrary = (monster) => {
+    const enemy = normalizeMonster({ ...monster, id: Date.now() });
+    setEnemies((prev) => [...prev, enemy]);
+    addLog(`📚 Added ${enemy.name} from Monster Library.`);
+  };
+
+  const saveFormToMonsterLibrary = () => {
+    if (!enemyForm.name.trim() || !enemyForm.hp) {
+      addLog("❌ Monster name and HP required to save.");
+      return;
+    }
+
+    const monster = normalizeMonster({
+      name: enemyForm.name.trim(),
+      hp: Number(enemyForm.hp),
+      maxHp: Number(enemyForm.hp),
+      ac: Number(enemyForm.ac || 12),
+      init: Number(enemyForm.init || 0),
+      xp: Number(enemyForm.xp || 0),
+    });
+
+    setMonsterLibrary((prev) => {
+      const exists = prev.some((m) => m.name.toLowerCase() === monster.name.toLowerCase());
+      if (exists) {
+        addLog(`❌ Monster already exists in library: ${monster.name}.`);
+        return prev;
+      }
+      addLog(`💾 Monster saved to library: ${monster.name}.`);
+      return [...prev, { ...monster, id: undefined }];
+    });
+  };
+
+  const deleteMonsterFromLibrary = (name) => {
+    setMonsterLibrary((prev) => prev.filter((m) => m.name !== name));
+    addLog(`🗑️ Monster deleted from library: ${name}.`);
   };
 
   const updateEnemyHp = (id, amount) => {
@@ -837,6 +947,7 @@ Earth Node Progress: ${nodeProgress}%`;
       setParty(data.party || []);
       setEnemies(data.enemies || []);
       setDefeatedEnemies(data.defeatedEnemies || []);
+      setMonsterLibrary(data.monsterLibrary || DEFAULT_MONSTER_LIBRARY);
       setTurnIndex(data.turnIndex || 0);
       setRound(data.round || 1);
       setActiveEncounterName(data.activeEncounterName || "Current Encounter");
@@ -870,6 +981,7 @@ Earth Node Progress: ${nodeProgress}%`;
         setParty(data.party || []);
         setEnemies(data.enemies || []);
         setDefeatedEnemies(data.defeatedEnemies || []);
+      setMonsterLibrary(data.monsterLibrary || DEFAULT_MONSTER_LIBRARY);
         setTurnIndex(data.turnIndex || 0);
         setRound(data.round || 1);
         setActiveEncounterName(data.activeEncounterName || "Current Encounter");
@@ -953,7 +1065,14 @@ Earth Node Progress: ${nodeProgress}%`;
         </div>
 
         <div style={rightStyle}>
-          <EnemiesPanel enemies={enemies} enemyForm={enemyForm} setEnemyForm={setEnemyForm} addEnemy={addEnemy} updateEnemyHp={updateEnemyHp} removeEnemy={removeEnemy} toggleEnemyCondition={toggleEnemyCondition} />
+          <MonsterLibraryPanel
+            monsterLibrary={monsterLibrary}
+            monsterSearch={monsterSearch}
+            setMonsterSearch={setMonsterSearch}
+            addMonsterFromLibrary={addMonsterFromLibrary}
+            deleteMonsterFromLibrary={deleteMonsterFromLibrary}
+          />
+          <EnemiesPanel enemies={enemies} enemyForm={enemyForm} setEnemyForm={setEnemyForm} addEnemy={addEnemy} updateEnemyHp={updateEnemyHp} removeEnemy={removeEnemy} toggleEnemyCondition={toggleEnemyCondition} saveFormToMonsterLibrary={saveFormToMonsterLibrary} />
           <Panel title="Session Prep">
             <button style={buttonStyle} onClick={() => setSessionPrep(buildPrep())}>Auto Fill</button>
             <button style={buttonStyle} onClick={() => postToDiscord("session-prep", sessionPrep || buildPrep())}>Post</button>
@@ -1128,7 +1247,49 @@ function PartyPanel({ party, updatePartyField, updatePartyHp, toggleCondition })
   );
 }
 
-function EnemiesPanel({ enemies, enemyForm, setEnemyForm, addEnemy, updateEnemyHp, removeEnemy, toggleEnemyCondition }) {
+function MonsterLibraryPanel({ monsterLibrary, monsterSearch, setMonsterSearch, addMonsterFromLibrary, deleteMonsterFromLibrary }) {
+  const query = monsterSearch.trim().toLowerCase();
+  const filteredMonsters = monsterLibrary.filter((monster) =>
+    monster.name.toLowerCase().includes(query)
+  );
+
+  return (
+    <Panel title="Monster Library">
+      <input
+        style={inputStyle}
+        placeholder="Search monsters"
+        value={monsterSearch}
+        onChange={(event) => setMonsterSearch(event.target.value)}
+      />
+
+      <div style={monsterLibraryListStyle}>
+        {filteredMonsters.length === 0 ? (
+          <div style={{ opacity: 0.75 }}>No monsters found.</div>
+        ) : (
+          filteredMonsters.map((monster) => (
+            <div key={monster.name} style={innerCardStyle}>
+              <strong>{monster.name}</strong>
+              <div style={{ fontSize: 13, opacity: 0.9 }}>
+                HP {monster.hp}/{monster.maxHp} | AC {monster.ac} | XP {monster.xp}
+              </div>
+              <div style={{ fontSize: 12, marginTop: 4 }}>
+                {(monster.actions || []).slice(0, 4).join(" • ")}
+              </div>
+              <button style={smallButtonStyle} onClick={() => addMonsterFromLibrary(monster)}>
+                Add to Encounter
+              </button>
+              <button style={dangerButtonStyle} onClick={() => deleteMonsterFromLibrary(monster.name)}>
+                Delete
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </Panel>
+  );
+}
+
+function EnemiesPanel({ enemies, enemyForm, setEnemyForm, addEnemy, updateEnemyHp, removeEnemy, toggleEnemyCondition, saveFormToMonsterLibrary }) {
   return (
     <Panel title="Monster Control">
       <input style={inputStyle} placeholder="Enemy name" value={enemyForm.name} onChange={(e) => setEnemyForm({ ...enemyForm, name: e.target.value })} />
@@ -1139,6 +1300,7 @@ function EnemiesPanel({ enemies, enemyForm, setEnemyForm, addEnemy, updateEnemyH
         <input style={inputStyle} placeholder="XP" value={enemyForm.xp} onChange={(e) => setEnemyForm({ ...enemyForm, xp: e.target.value })} />
       </div>
       <button style={buttonStyle} onClick={addEnemy}>Add Monster</button>
+      <button style={buttonStyle} onClick={saveFormToMonsterLibrary}>💾 Save to Library</button>
       {enemies.map((e) => (
         <div key={e.id} style={{ ...innerCardStyle, ...(e.hp <= Math.floor(e.maxHp / 2) ? bloodiedStyle : {}) }}>
           <strong>{e.name}</strong>
@@ -1220,6 +1382,7 @@ const bloodiedStyle = { border: "1px solid #dc2626", boxShadow: "0 0 10px rgba(2
 const stickyTurnBarStyle = { position: "sticky", bottom: 0, background: "#0d1117", paddingTop: 10, marginTop: 10 };
 const textAreaStyle = { width: "100%", minHeight: 120, padding: 10, marginBottom: 8, background: "#111827", color: "#e5e7eb", border: "1px solid #3b4351", borderRadius: 6, boxSizing: "border-box", fontSize: 14 };
 const encounterListStyle = { marginTop: 10, maxHeight: 260, overflowY: "auto" };
+const monsterLibraryListStyle = { marginTop: 10, maxHeight: 320, overflowY: "auto" };
 const logBoxStyle = { maxHeight: 135, overflowY: "auto", fontSize: 13 };
 const linkButtonStyle = { display: "inline-block", textDecoration: "none", color: "#fff", background: "linear-gradient(180deg, #4b5563 0%, #252b34 100%)", border: "1px solid #6b7280", borderRadius: 6, padding: "10px 14px", fontWeight: "bold" };
 const miniGridStyle = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 6 };
