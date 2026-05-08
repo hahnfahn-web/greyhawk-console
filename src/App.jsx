@@ -1221,9 +1221,18 @@ function CombatDirectorPanel({ round, active, initiative, turnIndex, nextTurn, r
             </ul>
           </div>
           <div style={buttonWrapStyle}>
-            {(currentMonster.actions || []).map((action) => (
-              <button key={action} style={buttonStyle} onClick={() => recordMonsterAction(currentMonster.name, action)}>{action}</button>
-            ))}
+            {(currentMonster.actions || []).map((action) => {
+              const actionName = typeof action === "string" ? action : action.name;
+              return (
+                <button
+                  key={actionName}
+                  style={buttonStyle}
+                  onClick={() => recordMonsterAction(currentMonster, action)}
+                >
+                  {actionName}
+                </button>
+              );
+            })}
           </div>
 
           {selectedActionInfo && selectedActionInfo.monsterName === currentMonster.name && (
