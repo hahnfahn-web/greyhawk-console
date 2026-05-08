@@ -1335,12 +1335,19 @@ Earth Node Progress: ${nodeProgress}%`;
     window.location.reload();
   };
 
-  const layoutStyle = isMobile ? mobileGridStyle : desktopGridStyle;
-  const leftStyle = isMobile ? mobileSectionStyle : leftColumnStyle;
-  const topStyle = isMobile ? mobileSectionStyle : topBarStyle;
-  const centerStyle = isMobile ? mobileSectionStyle : centerColumnStyle;
-  const rightStyle = isMobile ? mobileSectionStyle : rightColumnStyle;
-  const bottomStyle = isMobile ? mobileSectionStyle : bottomBarStyle;
+  const workflowVisible = {
+    Prep: { left: false, top: true, center: false, right: true, bottom: true },
+    Live: { left: true, top: true, center: false, right: true, bottom: true },
+    Combat: { left: true, top: true, center: true, right: true, bottom: true },
+    "After Action": { left: false, top: true, center: true, right: true, bottom: true },
+  }[workflowMode] || { left: true, top: true, center: true, right: true, bottom: true };
+
+  const layoutStyle = isMobile ? mobileGridStyle : getDesktopGridStyle(workflowMode);
+  const leftStyle = workflowVisible.left ? (isMobile ? mobileSectionStyle : leftColumnStyle) : hiddenStyle;
+  const topStyle = workflowVisible.top ? (isMobile ? mobileSectionStyle : topBarStyle) : hiddenStyle;
+  const centerStyle = workflowVisible.center ? (isMobile ? mobileSectionStyle : centerColumnStyle) : hiddenStyle;
+  const rightStyle = workflowVisible.right ? (isMobile ? mobileSectionStyle : rightColumnStyle) : hiddenStyle;
+  const bottomStyle = workflowVisible.bottom ? (isMobile ? mobileSectionStyle : bottomBarStyle) : hiddenStyle;
 
   return (
     <div style={pageStyle}>
@@ -1859,7 +1866,53 @@ const workflowButtonStyle = { background: "linear-gradient(180deg, #374151 0%, #
 const workflowButtonActiveStyle = { ...workflowButtonStyle, background: "linear-gradient(180deg, #8a6d1d 0%, #4a3415 100%)", color: "#fff2b8", border: "1px solid #d6a03d", boxShadow: "0 0 10px rgba(214,160,61,0.35)" };
 const workflowStatusStyle = { color: "#cbd5e1", fontSize: 13 };
 const mobileTitleStyle = { ...titleStyle, fontSize: 36, lineHeight: 1 };
-const desktopGridStyle = { display: "grid", gridTemplateColumns: "minmax(360px, 440px) minmax(620px, 1fr) minmax(360px, 440px)", gridTemplateRows: "auto 1fr 180px", gridTemplateAreas: `"left top right" "left center right" "bottom bottom bottom"`, gap: 12, width: "100%", maxWidth: "100%", minHeight: "calc(100vh - 80px)" };
+const hiddenStyle = { display: "none" };
+
+function getDesktopGridStyle(mode) {
+  const base = {
+    display: "grid",
+    gap: 12,
+    width: "100%",
+    maxWidth: "100%",
+    minHeight: "calc(100vh - 120px)",
+  };
+
+  if (mode === "Prep") {
+    return {
+      ...base,
+      gridTemplateColumns: "minmax(520px, 1fr) minmax(420px, 520px)",
+      gridTemplateRows: "auto 1fr 180px",
+      gridTemplateAreas: `"top right" "top right" "bottom bottom"`,
+    };
+  }
+
+  if (mode === "Live") {
+    return {
+      ...base,
+      gridTemplateColumns: "minmax(360px, 440px) minmax(520px, 1fr) minmax(360px, 440px)",
+      gridTemplateRows: "auto 1fr 180px",
+      gridTemplateAreas: `"left top right" "left top right" "bottom bottom bottom"`,
+    };
+  }
+
+  if (mode === "After Action") {
+    return {
+      ...base,
+      gridTemplateColumns: "minmax(620px, 1fr) minmax(420px, 520px)",
+      gridTemplateRows: "auto 1fr 180px",
+      gridTemplateAreas: `"top right" "center right" "bottom bottom"`,
+    };
+  }
+
+  return {
+    ...base,
+    gridTemplateColumns: "minmax(360px, 440px) minmax(620px, 1fr) minmax(360px, 440px)",
+    gridTemplateRows: "auto 1fr 180px",
+    gridTemplateAreas: `"left top right" "left center right" "bottom bottom bottom"`,
+  };
+}
+
+const desktopGridStyle = getDesktopGridStyle("Combat");
 const mobileGridStyle = { display: "grid", gridTemplateColumns: "1fr", gap: 12 };
 const mobileSectionStyle = { display: "grid", gap: 12, alignContent: "start", minWidth: 0 };
 const leftColumnStyle = { gridArea: "left", display: "grid", gap: 12, alignContent: "start", minHeight: 0, overflowY: "auto" };
