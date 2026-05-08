@@ -141,11 +141,49 @@ const ACTION_DETAILS = {
   },
 };
 
-function getActionDetails(action) {
-  return ACTION_DETAILS[action] || {
-    roll: "Use the most appropriate 2014 5E roll: attack roll, saving throw, ability check, or no roll if purely tactical.",
-    effect: "Resolve based on the monster's stat block or your encounter notes.",
-    note: "Use this action if it fits the creature's instincts, orders, and battlefield position.",
+function getActionDetails(monster, action) {
+  const actionObject = typeof action === "string" ? { name: action } : action;
+  const actionName = actionObject.name || "Action";
+
+  if (actionObject.roll || actionObject.effect || actionObject.hit || actionObject.save) {
+    const roll = actionObject.roll
+      || (actionObject.attackBonus !== undefined
+        ? `${actionObject.type || "Attack"}: d20 +${actionObject.attackBonus} vs AC.`
+        : actionObject.save
+          ? `Target makes a DC ${actionObject.dc || monster.spellSaveDc || 12} ${actionObject.save} saving throw.`
+          : "No roll unless the DM calls for one.");
+
+    return {
+      roll,
+      effect: actionObject.effect || actionObject.hit || "Resolve according to the monster's action text.",
+      note: actionObject.tactics || actionObject.note || "Use when tactically appropriate.",
+    };
+  }
+
+  const fallback = ACTION_DETAILS[actionName];
+  if (!fallback) {
+    return {
+      roll: "Use the most appropriate 2014 5E roll: attack roll, saving throw, ability check, or no roll if purely tactical.",
+      effect: "Resolve based on the monster's stat block or your encounter notes.",
+      note: "Use this action if it fits the creature's instincts, orders, and battlefield position.",
+    };
+  }
+
+  let roll = fallback.roll;
+  if (roll.includes("d20 + attack bonus")) {
+    roll = roll.replace("d20 + attack bonus", `d20 +${monster.attackBonus || 3}`);
+  }
+  if (roll.includes("spell save DC")) {
+    roll = roll.replace("spell save DC", `DC ${monster.spellSaveDc || 12}`);
+  }
+  if (roll.includes("spell attack bonus")) {
+    roll = roll.replace("spell attack bonus", `+${monster.spellAttackBonus || 4}`);
+  }
+
+  return {
+    roll,
+    effect: fallback.effect,
+    note: fallback.note,
   };
 }
 
@@ -359,19 +397,44 @@ function downloadJSON(data, filename) {
 }
 
 function normalizeMonster(monster, index = 0) {
-  return {
+  const base = {
     id: monster.id || Date.now() + index,
     name: monster.name || "Unknown Foe",
+    size: monster.size || "Medium",
+    type: monster.type || "humanoid",
+    alignment: monster.alignment || "unaligned",
     hp: Number(monster.hp ?? monster.maxHp ?? 1),
     maxHp: Number(monster.maxHp ?? monster.hp ?? 1),
     ac: Number(monster.ac ?? 12),
+    speed: monster.speed || "30 ft.",
     init: Number(monster.init ?? 0),
     xp: Number(monster.xp ?? 0),
+    attackBonus: Number(monster.attackBonus ?? 3),
+    spellSaveDc: Number(monster.spellSaveDc ?? 12),
+    spellAttackBonus: Number(monster.spellAttackBonus ?? 4),
+    abilities: monster.abilities || {
+      str: 10,
+      dex: 10,
+      con: 10,
+      int: 10,
+      wis: 10,
+      cha: 10,
+    },
+    saves: monster.saves || "—",
+    skills: monster.skills || "—",
+    senses: monster.senses || "passive Perception 10",
+    languages: monster.languages || "—",
+    traits: monster.traits || [],
     conditions: monster.conditions || [],
-    actions: monster.actions || ["Attack", "Dodge", "Disengage", "Flee"],
     tactics: monster.tactics || ["Attack the nearest threat.", "Use cover if available.", "Retreat if bloodied."],
     loot: monster.loot || [],
   };
+
+  base.actions = (monster.actions || ["Attack", "Dodge", "Disengage", "Flee"]).map((action) =>
+    typeof action === "string" ? { name: action } : action
+  );
+
+  return base;
 }
 
 function getPhase(hour) {
@@ -686,10 +749,11 @@ export default function App() {
     if (enemy) addLog(`Enemy removed: ${enemy.name}.`);
   };
 
-  const recordMonsterAction = (monsterName, action) => {
-    const details = getActionDetails(action);
-    setSelectedActionInfo({ monsterName, action, ...details });
-    addLog(`🎲 ${monsterName} considers ${action}.`);
+  const recordMonsterAction = (monster, action) => {
+    const actionName = typeof action === "string" ? action : action.name;
+    const details = getActionDetails(monster, action);
+    setSelectedActionInfo({ monsterName: monster.name, action: actionName, ...details });
+    addLog(`🎲 ${monster.name} considers ${actionName}.`);
   };
 
   const addNpc = () => {
