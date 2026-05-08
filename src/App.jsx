@@ -1353,6 +1353,7 @@ Earth Node Progress: ${nodeProgress}%`;
     <div style={pageStyle}>
       <h1 style={isMobile ? mobileTitleStyle : titleStyle}>Greyhawk Command Console v4</h1>
       <WorkflowBar workflowMode={workflowMode} setWorkflowMode={setWorkflowMode} />
+      <WorkflowGuide workflowMode={workflowMode} />
       <main style={layoutStyle}>
         <div style={leftStyle}>
           <PartyPanel party={party} updatePartyField={updatePartyField} updatePartyHp={updatePartyHp} toggleCondition={toggleCondition} />
@@ -1515,6 +1516,45 @@ function WorkflowBar({ workflowMode, setWorkflowMode }) {
         })}
       </div>
       <div style={workflowStatusStyle}>Current Mode: {workflowMode}</div>
+    </div>
+  );
+}
+
+function WorkflowGuide({ workflowMode }) {
+  const guides = {
+    Prep: {
+      title: "Prep Mode",
+      text: "Build tonight's session, review world state, prepare Discord posts, and stage encounters before the table sits down.",
+      steps: ["Auto Fill Session Prep", "Review World Clock", "Check Faction / Node state", "Prepare encounters"],
+    },
+    Live: {
+      title: "Live Mode",
+      text: "Run exploration, NPC interactions, rumors, time passage, and general table management without the combat panels taking over.",
+      steps: ["Track party status", "Update NPCs", "Advance time", "Post notes to Discord"],
+    },
+    Combat: {
+      title: "Combat Mode",
+      text: "Run initiative, monster turns, HP, conditions, tactics, XP, loot, and encounter summaries in real time.",
+      steps: ["Load or add monsters", "Use Next Turn", "Use monster actions", "End Encounter when foes fall"],
+    },
+    "After Action": {
+      title: "After Action Mode",
+      text: "Close the loop after play: summarize events, post loot, export campaign state, and preserve the record of the session.",
+      steps: ["Generate encounter summary", "Post loot", "Save campaign", "Export backup JSON"],
+    },
+  };
+
+  const guide = guides[workflowMode] || guides.Live;
+
+  return (
+    <div style={workflowGuideStyle}>
+      <div style={workflowGuideTitleStyle}>{guide.title}</div>
+      <div style={workflowGuideTextStyle}>{guide.text}</div>
+      <div style={workflowGuideStepsStyle}>
+        {guide.steps.map((step) => (
+          <span key={step} style={workflowGuideStepStyle}>{step}</span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1865,6 +1905,11 @@ const workflowButtonWrapStyle = { display: "flex", flexWrap: "wrap", gap: 6 };
 const workflowButtonStyle = { background: "linear-gradient(180deg, #374151 0%, #1f2937 100%)", color: "#e5e7eb", border: "1px solid #4b5563", borderRadius: 6, padding: "9px 12px", cursor: "pointer", fontSize: 14 };
 const workflowButtonActiveStyle = { ...workflowButtonStyle, background: "linear-gradient(180deg, #8a6d1d 0%, #4a3415 100%)", color: "#fff2b8", border: "1px solid #d6a03d", boxShadow: "0 0 10px rgba(214,160,61,0.35)" };
 const workflowStatusStyle = { color: "#cbd5e1", fontSize: 13 };
+const workflowGuideStyle = { background: "#111827", border: "1px solid #374151", borderRadius: 8, padding: 10, marginBottom: 12 };
+const workflowGuideTitleStyle = { color: "#f2d28b", fontWeight: "bold", marginBottom: 4, textTransform: "uppercase" };
+const workflowGuideTextStyle = { color: "#d1d5db", fontSize: 14, marginBottom: 8 };
+const workflowGuideStepsStyle = { display: "flex", flexWrap: "wrap", gap: 6 };
+const workflowGuideStepStyle = { background: "#1f2937", border: "1px solid #4b5563", borderRadius: 999, padding: "4px 8px", fontSize: 12, color: "#e5e7eb" };
 const mobileTitleStyle = { ...titleStyle, fontSize: 36, lineHeight: 1 };
 const hiddenStyle = { display: "none" };
 
