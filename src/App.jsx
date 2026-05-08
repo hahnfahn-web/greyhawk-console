@@ -714,6 +714,59 @@ export default function App() {
     addLog(`🗑️ Monster deleted from library: ${name}.`);
   };
 
+  const exportMonsterLibrary = () => {
+    downloadJSON(monsterLibrary, "GreyhawkMonsterLibrary.json");
+    addLog("📤 Monster Library exported.");
+  };
+
+  const importMonsterLibrary = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = (loadEvent) => {
+      try {
+        const imported = JSON.parse(loadEvent.target.result);
+
+        if (!Array.isArray(imported)) {
+          addLog("❌ Monster Library import failed: file must contain an array.");
+          return;
+        }
+
+        const normalizedImports = imported.map((monster, index) => {
+          const normalized = normalizeMonster(monster, index);
+          return { ...normalized, id: undefined };
+        });
+
+        setMonsterLibrary((prev) => {
+          const merged = [...prev];
+
+          normalizedImports.forEach((monster) => {
+            const existingIndex = merged.findIndex(
+              (entry) => entry.name.toLowerCase() === monster.name.toLowerCase()
+            );
+
+            if (existingIndex >= 0) {
+              merged[existingIndex] = monster;
+            } else {
+              merged.push(monster);
+            }
+          });
+
+          return merged;
+        });
+
+        addLog(`📥 Imported ${normalizedImports.length} monster(s) into library.`);
+        event.target.value = "";
+      } catch {
+        addLog("❌ Monster Library import failed: invalid JSON.");
+      }
+    };
+
+    reader.readAsText(file);
+  };
+
   const updateEnemyHp = (id, amount) => {
     setEnemies((prev) => {
       return prev.flatMap((e) => {
@@ -1225,6 +1278,8 @@ Earth Node Progress: ${nodeProgress}%`;
             setMonsterSearch={setMonsterSearch}
             addMonsterFromLibrary={addMonsterFromLibrary}
             deleteMonsterFromLibrary={deleteMonsterFromLibrary}
+            exportMonsterLibrary={exportMonsterLibrary}
+            importMonsterLibrary={importMonsterLibrary}
           />
           <EnemiesPanel enemies={enemies} enemyForm={enemyForm} setEnemyForm={setEnemyForm} addEnemy={addEnemy} updateEnemyHp={updateEnemyHp} removeEnemy={removeEnemy} toggleEnemyCondition={toggleEnemyCondition} saveFormToMonsterLibrary={saveFormToMonsterLibrary} />
           <Panel title="Session Prep">
@@ -1480,7 +1535,7 @@ function PartyPanel({ party, updatePartyField, updatePartyHp, toggleCondition })
   );
 }
 
-function MonsterLibraryPanel({ monsterLibrary, monsterSearch, setMonsterSearch, addMonsterFromLibrary, deleteMonsterFromLibrary }) {
+function MonsterLibraryPanel({ monsterLibrary, monsterSearch, setMonsterSearch, addMonsterFromLibrary, deleteMonsterFromLibrary, exportMonsterLibrary, importMonsterLibrary }) {
   const query = monsterSearch.trim().toLowerCase();
   const filteredMonsters = monsterLibrary.filter((monster) =>
     monster.name.toLowerCase().includes(query)
@@ -1494,6 +1549,22 @@ function MonsterLibraryPanel({ monsterLibrary, monsterSearch, setMonsterSearch, 
         value={monsterSearch}
         onChange={(event) => setMonsterSearch(event.target.value)}
       />
+
+      <div style={buttonWrapStyle}>
+        <button style={smallButtonStyle} onClick={exportMonsterLibrary}>
+          📤 Export Library
+        </button>
+
+        <label style={smallButtonStyle}>
+          📥 Import Library
+          <input
+            type="file"
+            accept=".json"
+            onChange={importMonsterLibrary}
+            style={{ display: "none" }}
+          />
+        </label>
+      </div>
 
       <div style={monsterLibraryListStyle}>
         {filteredMonsters.length === 0 ? (
