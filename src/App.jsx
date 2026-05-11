@@ -187,6 +187,63 @@ function getActionDetails(monster, action) {
   };
 }
 
+function getMonsterTurnSuggestions(monster, party = []) {
+  if (!monster) return [];
+
+  const suggestions = [];
+  const hpRatio = monster.maxHp ? monster.hp / monster.maxHp : 1;
+  const actions = monster.actions || [];
+  const actionNames = actions.map((action) =>
+    typeof action === "string" ? action : action.name || "Action"
+  );
+
+  const lowestHpPc = party
+    .filter((pc) => pc.hp > 0)
+    .sort((a, b) => a.hp - b.hp)[0];
+
+  const likelyCaster = party.find((pc) =>
+    /fern|wizard|cleric|druid|bard|sorcerer|warlock/i.test(pc.name)
+  );
+
+  if (hpRatio <= 0.5) {
+    suggestions.push("Bloodied: consider defensive positioning, calling aid, retreat, frenzy, or a desperate special action.");
+  }
+
+  if (actionNames.some((name) => /recharge/i.test(name)) || actions.some((action) => /recharge/i.test(action.type || ""))) {
+    suggestions.push("Recharge action present: roll 1d6 at the start of this monster's turn if the recharge action was already used.");
+  }
+
+  if (actionNames.some((name) => /restrain|grasp|hold|root/i.test(name))) {
+    suggestions.push("Control tactic: restrain an isolated target, then pressure the party to spend actions freeing them.");
+  }
+
+  if (actionNames.some((name) => /bless|command|hold person|spiritual weapon|sacred flame/i.test(name))) {
+    suggestions.push("Caster tactic: use save-based spells against high-AC targets and concentration buffs early while allies remain.");
+  }
+
+  if (actionNames.some((name) => /dash|retreat|disengage|flee/i.test(name))) {
+    suggestions.push("Mobility option available: reposition, flee toward reinforcements, or force the party to pursue.");
+  }
+
+  if (lowestHpPc) {
+    suggestions.push("Target pressure: " + lowestHpPc.name + " is the most wounded visible PC at " + lowestHpPc.hp + "/" + lowestHpPc.maxHp + " HP.");
+  }
+
+  if (likelyCaster) {
+    suggestions.push("Caster pressure: consider disrupting " + likelyCaster.name + " if the monster is intelligent or cult-directed.");
+  }
+
+  if ((monster.traits || []).some((trait) => /death burst|collapse|explodes|reduced to 0/i.test(trait))) {
+    suggestions.push("Death trigger: remind players of danger when this creature drops to 0 HP; resolve burst/collapse effects immediately.");
+  }
+
+  if ((monster.tactics || []).length > 0) {
+    suggestions.push("Primary tactic: " + monster.tactics[0]);
+  }
+
+  return suggestions.slice(0, 6);
+}
+
 const DEFAULT_MONSTER_LIBRARY = [
   {
     name: "Cultist Acolyte",
@@ -1554,6 +1611,7 @@ Earth Node Progress: ${nodeProgress}%`;
         <div style={centerStyle}>
           {(workflowMode === "Combat" || workflowMode === "After Action") && (
             <CombatDirectorPanel
+              party={party}
               round={round}
               active={active}
               initiative={initiative}
@@ -1799,9 +1857,10 @@ function WorldClockPanel({ calendar, advanceTime }) {
   );
 }
 
-function CombatDirectorPanel({ round, active, initiative, turnIndex, nextTurn, resetCombat, loadCultAmbush, recordMonsterAction, startEditingAction, editingMonsterId, editingActionIndex, actionEditor, setActionEditor, saveEditedAction, saveMonsterToLibrary, selectedActionInfo, defeatedEnemies, enemies, endEncounter, encounterSummary, postEncounterSummary, postEncounterLoot }) {
+function CombatDirectorPanel({ party, round, active, initiative, turnIndex, nextTurn, resetCombat, loadCultAmbush, recordMonsterAction, startEditingAction, editingMonsterId, editingActionIndex, actionEditor, setActionEditor, saveEditedAction, saveMonsterToLibrary, selectedActionInfo, defeatedEnemies, enemies, endEncounter, encounterSummary, postEncounterSummary, postEncounterLoot }) {
   const currentMonster = active?.type === "Enemy" ? active : null;
   const allEnemiesDefeated = enemies.length === 0 && defeatedEnemies.length > 0;
+  const turnSuggestions = currentMonster ? getMonsterTurnSuggestions(currentMonster, party) : [];
 
   return (
     <Panel title="Combat Director">
@@ -1814,8 +1873,17 @@ function CombatDirectorPanel({ round, active, initiative, turnIndex, nextTurn, r
         <div style={directorCardStyle}>
           <h3 style={subHeaderStyle}>Monster Turn: {currentMonster.name}</h3>
           <div><strong>HP:</strong> {currentMonster.hp}/{currentMonster.maxHp} | <strong>AC:</strong> {currentMonster.ac}</div>
+          <div style={combatAdvisorStyle}>
+            <strong>Combat Advisor v2</strong>
+            <ul style={{ marginTop: 6 }}>
+              {turnSuggestions.map((suggestion, index) => (
+                <li key={index}>{suggestion}</li>
+              ))}
+            </ul>
+          </div>
+
           <div style={{ marginTop: 8 }}>
-            <strong>Suggested Tactics</strong>
+            <strong>Monster Tactics</strong>
             <ul style={{ marginTop: 4 }}>
               {(currentMonster.tactics || []).map((t, i) => <li key={i}>{t}</li>)}
               {currentMonster.hp <= Math.floor(currentMonster.maxHp / 2) && <li>Bloodied: consider retreat, defensive action, or calling for aid.</li>}
@@ -2300,6 +2368,7 @@ const directorCardStyle = { ...innerCardStyle, background: "#151b25", border: "1
 const actionDetailStyle = { marginTop: 10, padding: 10, background: "#0f172a", border: "1px solid #8a6d1d", borderRadius: 6 };
 const monsterStatCardStyle = { marginTop: 10, padding: 12, background: "#111827", border: "1px solid #4b5563", borderRadius: 6 };
 const actionEditorStyle = { marginTop: 10, padding: 12, background: "#161f2d", border: "1px solid #4b5563", borderRadius: 6 };
+const combatAdvisorStyle = { marginTop: 10, padding: 12, background: "#172033", border: "1px solid #d6a03d", borderRadius: 6, color: "#e5e7eb" };
 const panelTitleStyle = { color: "#f2d28b", margin: "0 0 8px", borderBottom: "1px solid #35291a", paddingBottom: 4, textTransform: "uppercase", fontSize: 17 };
 const subHeaderStyle = { color: "#f2d28b", margin: "4px 0 8px" };
 const inputStyle = { width: "100%", padding: 9, marginBottom: 8, background: "#111827", color: "#e5e7eb", border: "1px solid #3b4351", borderRadius: 6, boxSizing: "border-box", fontSize: 14 };
