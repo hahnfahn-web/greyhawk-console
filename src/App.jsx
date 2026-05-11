@@ -1586,6 +1586,7 @@ Earth Node Progress: ${nodeProgress}%`;
               setSessionPrep={setSessionPrep}
               buildPrep={buildPrep}
               postToDiscord={postToDiscord}
+              addLog={addLog}
               prepFocus={prepFocus}
               setPrepFocus={setPrepFocus}
               prepThreat={prepThreat}
@@ -1921,6 +1922,7 @@ function SessionPrepGeneratorPanel({
   setSessionPrep,
   buildPrep,
   postToDiscord,
+  addLog,
   prepFocus,
   setPrepFocus,
   prepThreat,
@@ -1930,6 +1932,18 @@ function SessionPrepGeneratorPanel({
 }) {
   const generatePrep = () => {
     setSessionPrep(buildPrep());
+    addLog("🕯️ Session prep generated.");
+  };
+
+  const postPrep = async () => {
+    const message = sessionPrep?.trim() ? sessionPrep : buildPrep();
+
+    if (!sessionPrep?.trim()) {
+      setSessionPrep(message);
+    }
+
+    addLog("📡 Sending session prep to #session-prep...");
+    await postToDiscord("session-prep", message);
   };
 
   return (
@@ -1958,7 +1972,7 @@ function SessionPrepGeneratorPanel({
 
       <div style={buttonWrapStyle}>
         <button style={buttonStyle} onClick={generatePrep}>🕯️ Generate Prep</button>
-        <button style={buttonStyle} onClick={() => postToDiscord("session-prep", sessionPrep || buildPrep())}>Post to #session-prep</button>
+        <button style={buttonStyle} onClick={postPrep}>Post to #session-prep</button>
       </div>
 
       <textarea
