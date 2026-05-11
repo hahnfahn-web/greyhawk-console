@@ -692,21 +692,45 @@ export default function App() {
       addLog("❌ Bridge not configured.");
       return;
     }
+
     if (!message?.trim()) {
       addLog("❌ Nothing to post.");
       return;
     }
+
+    const MAX_DISCORD_LENGTH = 1800;
+    const chunks = [];
+    let remaining = message.trim();
+
+    while (remaining.length > MAX_DISCORD_LENGTH) {
+      let splitAt = remaining.lastIndexOf("
+", MAX_DISCORD_LENGTH);
+      if (splitAt < 500) splitAt = MAX_DISCORD_LENGTH;
+      chunks.push(remaining.slice(0, splitAt).trim());
+      remaining = remaining.slice(splitAt).trim();
+    }
+
+    if (remaining.length) chunks.push(remaining);
+
     try {
-      const res = await fetch(`${bridgeUrl}/discord/post`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({ channel: target, message }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      addLog(`✅ Posted to #${target}.`);
+      for (let index = 0; index < chunks.length; index += 1) {
+        const chunkLabel = chunks.length > 1 ? `
+
+_Part ${index + 1}/${chunks.length}_` : "";
+
+        const res = await fetch(`${bridgeUrl}/discord/post`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({ channel: target, message: chunks[index] + chunkLabel }),
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      }
+
+      addLog(`✅ Posted to #${target}${chunks.length > 1 ? ` in ${chunks.length} parts` : ""}.`);
     } catch (err) {
       addLog(`❌ Post failed: ${err.message}`);
     }
