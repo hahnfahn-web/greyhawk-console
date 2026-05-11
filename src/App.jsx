@@ -698,13 +698,13 @@ export default function App() {
       return;
     }
 
+    const NL = String.fromCharCode(10);
     const MAX_DISCORD_LENGTH = 1800;
     const chunks = [];
     let remaining = message.trim();
 
     while (remaining.length > MAX_DISCORD_LENGTH) {
-      let splitAt = remaining.lastIndexOf("\n", MAX_DISCORD_LENGTH);
-
+      let splitAt = remaining.lastIndexOf(NL, MAX_DISCORD_LENGTH);
       if (splitAt < 500) splitAt = MAX_DISCORD_LENGTH;
       chunks.push(remaining.slice(0, splitAt).trim());
       remaining = remaining.slice(splitAt).trim();
@@ -714,9 +714,9 @@ export default function App() {
 
     try {
       for (let index = 0; index < chunks.length; index += 1) {
-        const chunkLabel = chunks.length > 1 ? `
-
-_Part ${index + 1}/${chunks.length}_` : "";
+        const chunkLabel = chunks.length > 1
+          ? NL + NL + "_Part " + (index + 1) + "/" + chunks.length + "_"
+          : "";
 
         const res = await fetch(`${bridgeUrl}/discord/post`, {
           method: "POST",
@@ -730,7 +730,8 @@ _Part ${index + 1}/${chunks.length}_` : "";
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
       }
 
-      addLog(`✅ Posted to #${target}${chunks.length > 1 ? ` in ${chunks.length} parts` : ""}.`);
+      const partText = chunks.length > 1 ? " in " + chunks.length + " parts" : "";
+      addLog(`✅ Posted to #${target}${partText}.`);
     } catch (err) {
       addLog(`❌ Post failed: ${err.message}`);
     }
