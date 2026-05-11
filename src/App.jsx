@@ -703,8 +703,8 @@ export default function App() {
     let remaining = message.trim();
 
     while (remaining.length > MAX_DISCORD_LENGTH) {
-      let splitAt = remaining.lastIndexOf("
-", MAX_DISCORD_LENGTH);
+      let splitAt = remaining.lastIndexOf("\n", MAX_DISCORD_LENGTH);
+
       if (splitAt < 500) splitAt = MAX_DISCORD_LENGTH;
       chunks.push(remaining.slice(0, splitAt).trim());
       remaining = remaining.slice(splitAt).trim();
