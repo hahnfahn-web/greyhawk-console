@@ -617,6 +617,9 @@ export default function App() {
   });
 
   const [sessionPrep, setSessionPrep] = useState(() => loadSaved("sessionPrep", ""));
+  const [prepFocus, setPrepFocus] = useState(() => loadSaved("prepFocus", "Temple of Elemental Evil"));
+  const [prepThreat, setPrepThreat] = useState(() => loadSaved("prepThreat", "Earth Cult pressure rises"));
+  const [prepLocation, setPrepLocation] = useState(() => loadSaved("prepLocation", "Kron Hills / Temple approaches"));
   const [savedEncounters, setSavedEncounters] = useState(() =>
     loadSaved("savedEncounters", DEFAULT_ENCOUNTERS)
   );
@@ -642,6 +645,9 @@ export default function App() {
   useEffect(() => localStorage.setItem("selectedActionInfo", JSON.stringify(selectedActionInfo)), [selectedActionInfo]);
   useEffect(() => localStorage.setItem("npcs", JSON.stringify(npcs)), [npcs]);
   useEffect(() => localStorage.setItem("sessionPrep", JSON.stringify(sessionPrep)), [sessionPrep]);
+  useEffect(() => localStorage.setItem("prepFocus", JSON.stringify(prepFocus)), [prepFocus]);
+  useEffect(() => localStorage.setItem("prepThreat", JSON.stringify(prepThreat)), [prepThreat]);
+  useEffect(() => localStorage.setItem("prepLocation", JSON.stringify(prepLocation)), [prepLocation]);
   useEffect(() => localStorage.setItem("savedEncounters", JSON.stringify(savedEncounters)), [savedEncounters]);
 
   const addLog = (msg) =>
@@ -956,6 +962,30 @@ export default function App() {
     reader.readAsText(file);
   };
 
+  const syncDefaultMonsters = () => {
+    let addedCount = 0;
+
+    setMonsterLibrary((prev) => {
+      const merged = [...prev];
+
+      DEFAULT_MONSTER_LIBRARY.forEach((defaultMonster) => {
+        const exists = merged.some(
+          (entry) => entry.name.toLowerCase() === defaultMonster.name.toLowerCase()
+        );
+
+        if (!exists) {
+          const normalized = normalizeMonster(defaultMonster);
+          merged.push({ ...normalized, id: undefined });
+          addedCount += 1;
+        }
+      });
+
+      return merged;
+    });
+
+    addLog(`🔄 Sync Defaults complete. Added ${addedCount} monster(s).`);
+  };
+
   const updateEnemyHp = (id, amount) => {
     setEnemies((prev) => {
       return prev.flatMap((e) => {
@@ -1189,20 +1219,58 @@ export default function App() {
     });
   };
 
-  const buildPrep = () => `## 🕯️ Session Prep
+  const buildPrep = () => `## 🕯️ Session Prep — Greyhawk Command Console
+
+**Focus:** ${prepFocus || "Temple of Elemental Evil"}
+**Primary Threat:** ${prepThreat || "Cult activity escalates"}
+**Likely Location:** ${prepLocation || "Near the Temple"}
 
 **Date:** ${calendar.date}, ${calendar.phase}, ${formatHour(calendar.time)}
 **Dungeon Turn:** ${calendar.dungeonTurn || 0}
 **Moon Phase:** ${calendar.moonPhase || "Waxing"}
 **Session:** #${calendar.session}
-**Earth Cult Alert:** ${earthCult}/5
-**Dungeon Alert:** ${dungeonAlert}/5
-**Earth Node Progress:** ${nodeProgress}%
 
-### Notes
-- Encounter ideas
-- NPC reactions
-- Treasure hooks`;
+## Current World State
+- Earth Cult Alert: ${earthCult}/5
+- Dungeon Alert: ${dungeonAlert}/5
+- Earth Node Progress: ${nodeProgress}%
+
+## Opening Recap
+The road behind the party is troubled by rumor, old blood, and the slow tightening grip of hidden powers. The cults beneath the Temple do not sleep. Their watchers listen from broken halls, muddy roads, and friendly-looking taprooms.
+
+## Likely Scenes
+1. **Approach / Investigation:** Signs of cult movement, disturbed earth, frightened locals, or unnatural silence.
+2. **NPC Pressure:** A suspicious villager, desperate informant, or cult-touched survivor forces a decision.
+3. **Dungeon or Wilderness Threat:** Patrols, traps, ambushes, or environmental hazards reveal the enemy's preparation.
+4. **Choice Point:** Press onward, retreat, negotiate, rest, or risk attracting greater attention.
+
+## Active NPC / Faction Moves
+- Earth Cult agents reinforce chokepoints and watch for relic-bearers.
+- Local informants grow nervous; one may sell information to the wrong side.
+- Rival cult influence may exploit any delay or visible weakness.
+
+## Rumors / Clues
+- "The ground has been breathing near the old stones."
+- "A hooded priest paid silver for names of armed strangers."
+- "Something root-bound and dead was seen moving in the reeds."
+
+## Encounter Options
+- Cult Ambush if the party moves openly or makes noise.
+- Rootbound Husk if they pass through marsh, roots, grave-soil, or corrupted wilderness.
+- Earth Temple Guard if they breach a fortified cult position.
+
+## Treasure / Rewards Hooks
+- Earth cult token or coded prayer strip.
+- Mud-caked relic fragment or blackened seed-core.
+- A recovered note pointing toward the next chamber, informant, or cult cell.
+
+## DM Reminders
+- Advance time after meaningful exploration.
+- Escalate Dungeon Alert if the party rests loudly, leaves witnesses, or triggers alarms.
+- Use bloodied monsters intelligently: flee, call aid, bargain, or die fanatically depending on morale.
+
+## Discord Player Teaser
+The old roads bend toward darker ground. Somewhere ahead, roots clutch bone, stone remembers blood, and the Temple waits beneath a silence too deliberate to be natural.`;
 
   const buildSnapshot = () => {
     const partyText = party
@@ -1507,16 +1575,24 @@ Earth Node Progress: ${nodeProgress}%`;
                 saveMonsterAsNew={saveMonsterAsNew}
                 exportMonsterLibrary={exportMonsterLibrary}
                 importMonsterLibrary={importMonsterLibrary}
+                syncDefaultMonsters={syncDefaultMonsters}
               />
               <EnemiesPanel enemies={enemies} enemyForm={enemyForm} setEnemyForm={setEnemyForm} addEnemy={addEnemy} updateEnemyHp={updateEnemyHp} removeEnemy={removeEnemy} toggleEnemyCondition={toggleEnemyCondition} saveFormToMonsterLibrary={saveFormToMonsterLibrary} />
             </>
           )}
           {(workflowMode === "Prep" || workflowMode === "Live") && (
-            <Panel title="Session Prep">
-              <button style={buttonStyle} onClick={() => setSessionPrep(buildPrep())}>Auto Fill</button>
-              <button style={buttonStyle} onClick={() => postToDiscord("session-prep", sessionPrep || buildPrep())}>Post</button>
-              <textarea style={textAreaStyle} value={sessionPrep} onChange={(e) => setSessionPrep(e.target.value)} />
-            </Panel>
+            <SessionPrepGeneratorPanel
+              sessionPrep={sessionPrep}
+              setSessionPrep={setSessionPrep}
+              buildPrep={buildPrep}
+              postToDiscord={postToDiscord}
+              prepFocus={prepFocus}
+              setPrepFocus={setPrepFocus}
+              prepThreat={prepThreat}
+              setPrepThreat={setPrepThreat}
+              prepLocation={prepLocation}
+              setPrepLocation={setPrepLocation}
+            />
           )}
 
           {(workflowMode === "Prep" || workflowMode === "Live" || workflowMode === "After Action") && (
@@ -1548,42 +1624,7 @@ Earth Node Progress: ${nodeProgress}%`;
         <div style={bottomStyle}>
           <Panel title="Log">
             <div style={logBoxStyle}>{log.length === 0 ? <p>No actions yet.</p> : log.map((l, i) => <div key={i}>• {l}</div>)}</div>
-
-      <div style={monsterEditorPanelStyle}>
-        <h3 style={subHeaderStyle}>Monster Editor</h3>
-
-        <input style={inputStyle} placeholder="Name" value={monsterEditor.name} onChange={(e) => setMonsterEditor({ ...monsterEditor, name: e.target.value })} />
-
-        <div style={miniGridStyle}>
-          <input style={inputStyle} placeholder="HP" value={monsterEditor.hp} onChange={(e) => setMonsterEditor({ ...monsterEditor, hp: e.target.value })} />
-          <input style={inputStyle} placeholder="AC" value={monsterEditor.ac} onChange={(e) => setMonsterEditor({ ...monsterEditor, ac: e.target.value })} />
-          <input style={inputStyle} placeholder="Init" value={monsterEditor.init} onChange={(e) => setMonsterEditor({ ...monsterEditor, init: e.target.value })} />
-          <input style={inputStyle} placeholder="XP" value={monsterEditor.xp} onChange={(e) => setMonsterEditor({ ...monsterEditor, xp: e.target.value })} />
-        </div>
-
-        <div style={miniGridStyle}>
-          <input style={inputStyle} placeholder="Attack Bonus" value={monsterEditor.attackBonus} onChange={(e) => setMonsterEditor({ ...monsterEditor, attackBonus: e.target.value })} />
-          <input style={inputStyle} placeholder="Spell Save DC" value={monsterEditor.spellSaveDc} onChange={(e) => setMonsterEditor({ ...monsterEditor, spellSaveDc: e.target.value })} />
-          <input style={inputStyle} placeholder="Spell Attack Bonus" value={monsterEditor.spellAttackBonus} onChange={(e) => setMonsterEditor({ ...monsterEditor, spellAttackBonus: e.target.value })} />
-          <input style={inputStyle} placeholder="Speed" value={monsterEditor.speed} onChange={(e) => setMonsterEditor({ ...monsterEditor, speed: e.target.value })} />
-        </div>
-
-        <input style={inputStyle} placeholder="Senses" value={monsterEditor.senses} onChange={(e) => setMonsterEditor({ ...monsterEditor, senses: e.target.value })} />
-
-        <input style={inputStyle} placeholder="Languages" value={monsterEditor.languages} onChange={(e) => setMonsterEditor({ ...monsterEditor, languages: e.target.value })} />
-
-        <textarea style={textAreaStyle} placeholder="Traits (one per line)" value={monsterEditor.traits} onChange={(e) => setMonsterEditor({ ...monsterEditor, traits: e.target.value })} />
-
-        <textarea style={textAreaStyle} placeholder="Tactics (one per line)" value={monsterEditor.tactics} onChange={(e) => setMonsterEditor({ ...monsterEditor, tactics: e.target.value })} />
-
-        <textarea style={textAreaStyle} placeholder="Loot (one per line)" value={monsterEditor.loot} onChange={(e) => setMonsterEditor({ ...monsterEditor, loot: e.target.value })} />
-
-        <div style={buttonWrapStyle}>
-          <button style={buttonStyle} onClick={saveMonsterEditor}>💾 Save Monster</button>
-          <button style={buttonStyle} onClick={saveMonsterAsNew}>📚 Save As New</button>
-        </div>
-      </div>
-    </Panel>
+</Panel>
         </div>
       </main>
     </div>
@@ -1875,6 +1916,60 @@ function CombatDirectorPanel({ round, active, initiative, turnIndex, nextTurn, r
   );
 }
 
+function SessionPrepGeneratorPanel({
+  sessionPrep,
+  setSessionPrep,
+  buildPrep,
+  postToDiscord,
+  prepFocus,
+  setPrepFocus,
+  prepThreat,
+  setPrepThreat,
+  prepLocation,
+  setPrepLocation,
+}) {
+  const generatePrep = () => {
+    setSessionPrep(buildPrep());
+  };
+
+  return (
+    <Panel title="Session Prep Generator">
+      <div style={miniGridStyle}>
+        <input
+          style={inputStyle}
+          placeholder="Session focus"
+          value={prepFocus}
+          onChange={(event) => setPrepFocus(event.target.value)}
+        />
+        <input
+          style={inputStyle}
+          placeholder="Primary threat"
+          value={prepThreat}
+          onChange={(event) => setPrepThreat(event.target.value)}
+        />
+      </div>
+
+      <input
+        style={inputStyle}
+        placeholder="Likely location"
+        value={prepLocation}
+        onChange={(event) => setPrepLocation(event.target.value)}
+      />
+
+      <div style={buttonWrapStyle}>
+        <button style={buttonStyle} onClick={generatePrep}>🕯️ Generate Prep</button>
+        <button style={buttonStyle} onClick={() => postToDiscord("session-prep", sessionPrep || buildPrep())}>Post to #session-prep</button>
+      </div>
+
+      <textarea
+        style={{ ...textAreaStyle, minHeight: 320 }}
+        value={sessionPrep}
+        onChange={(event) => setSessionPrep(event.target.value)}
+      />
+    </Panel>
+  );
+}
+
 function EncounterLibraryPanel({ encounterName, setEncounterName, saveCurrentEncounter, savedEncounters, loadEncounter, deleteEncounter }) {
   return (
     <Panel title="Encounter Library">
@@ -1924,7 +2019,21 @@ function PartyPanel({ party, updatePartyField, updatePartyHp, toggleCondition })
   );
 }
 
-function MonsterLibraryPanel({ monsterLibrary, monsterSearch, setMonsterSearch, addMonsterFromLibrary, deleteMonsterFromLibrary, exportMonsterLibrary, importMonsterLibrary, openMonsterEditor, monsterEditor, setMonsterEditor, saveMonsterEditor, saveMonsterAsNew }) {
+function MonsterLibraryPanel({
+  monsterLibrary,
+  monsterSearch,
+  setMonsterSearch,
+  addMonsterFromLibrary,
+  deleteMonsterFromLibrary,
+  openMonsterEditor,
+  monsterEditor,
+  setMonsterEditor,
+  saveMonsterEditor,
+  saveMonsterAsNew,
+  exportMonsterLibrary,
+  importMonsterLibrary,
+  syncDefaultMonsters,
+}) {
   const query = monsterSearch.trim().toLowerCase();
   const filteredMonsters = monsterLibrary.filter((monster) =>
     monster.name.toLowerCase().includes(query)
@@ -1943,7 +2052,9 @@ function MonsterLibraryPanel({ monsterLibrary, monsterSearch, setMonsterSearch, 
         <button style={smallButtonStyle} onClick={exportMonsterLibrary}>
           📤 Export Library
         </button>
-
+        <button style={smallButtonStyle} onClick={syncDefaultMonsters}>
+          🔄 Sync Defaults
+        </button>
         <label style={smallButtonStyle}>
           📥 Import Library
           <input
@@ -1966,7 +2077,10 @@ function MonsterLibraryPanel({ monsterLibrary, monsterSearch, setMonsterSearch, 
                 HP {monster.hp}/{monster.maxHp} | AC {monster.ac} | XP {monster.xp}
               </div>
               <div style={{ fontSize: 12, marginTop: 4 }}>
-                {(monster.actions || []).slice(0, 4).join(" • ")}
+                {(monster.actions || [])
+                  .slice(0, 4)
+                  .map((action) => (typeof action === "string" ? action : action.name))
+                  .join(" • ")}
               </div>
               <button style={smallButtonStyle} onClick={() => addMonsterFromLibrary(monster)}>
                 Add to Encounter
@@ -1980,6 +2094,32 @@ function MonsterLibraryPanel({ monsterLibrary, monsterSearch, setMonsterSearch, 
             </div>
           ))
         )}
+      </div>
+
+      <div style={monsterEditorPanelStyle}>
+        <h3 style={subHeaderStyle}>Monster Editor</h3>
+        <input style={inputStyle} placeholder="Name" value={monsterEditor.name} onChange={(e) => setMonsterEditor({ ...monsterEditor, name: e.target.value })} />
+        <div style={miniGridStyle}>
+          <input style={inputStyle} placeholder="HP" value={monsterEditor.hp} onChange={(e) => setMonsterEditor({ ...monsterEditor, hp: e.target.value })} />
+          <input style={inputStyle} placeholder="AC" value={monsterEditor.ac} onChange={(e) => setMonsterEditor({ ...monsterEditor, ac: e.target.value })} />
+          <input style={inputStyle} placeholder="Init" value={monsterEditor.init} onChange={(e) => setMonsterEditor({ ...monsterEditor, init: e.target.value })} />
+          <input style={inputStyle} placeholder="XP" value={monsterEditor.xp} onChange={(e) => setMonsterEditor({ ...monsterEditor, xp: e.target.value })} />
+        </div>
+        <div style={miniGridStyle}>
+          <input style={inputStyle} placeholder="Attack Bonus" value={monsterEditor.attackBonus} onChange={(e) => setMonsterEditor({ ...monsterEditor, attackBonus: e.target.value })} />
+          <input style={inputStyle} placeholder="Spell Save DC" value={monsterEditor.spellSaveDc} onChange={(e) => setMonsterEditor({ ...monsterEditor, spellSaveDc: e.target.value })} />
+          <input style={inputStyle} placeholder="Spell Attack Bonus" value={monsterEditor.spellAttackBonus} onChange={(e) => setMonsterEditor({ ...monsterEditor, spellAttackBonus: e.target.value })} />
+          <input style={inputStyle} placeholder="Speed" value={monsterEditor.speed} onChange={(e) => setMonsterEditor({ ...monsterEditor, speed: e.target.value })} />
+        </div>
+        <input style={inputStyle} placeholder="Senses" value={monsterEditor.senses} onChange={(e) => setMonsterEditor({ ...monsterEditor, senses: e.target.value })} />
+        <input style={inputStyle} placeholder="Languages" value={monsterEditor.languages} onChange={(e) => setMonsterEditor({ ...monsterEditor, languages: e.target.value })} />
+        <textarea style={textAreaStyle} placeholder="Traits (one per line)" value={monsterEditor.traits} onChange={(e) => setMonsterEditor({ ...monsterEditor, traits: e.target.value })} />
+        <textarea style={textAreaStyle} placeholder="Tactics (one per line)" value={monsterEditor.tactics} onChange={(e) => setMonsterEditor({ ...monsterEditor, tactics: e.target.value })} />
+        <textarea style={textAreaStyle} placeholder="Loot (one per line)" value={monsterEditor.loot} onChange={(e) => setMonsterEditor({ ...monsterEditor, loot: e.target.value })} />
+        <div style={buttonWrapStyle}>
+          <button style={buttonStyle} onClick={saveMonsterEditor}>💾 Save Monster</button>
+          <button style={buttonStyle} onClick={saveMonsterAsNew}>📚 Save As New</button>
+        </div>
       </div>
     </Panel>
   );
