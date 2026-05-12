@@ -2409,52 +2409,48 @@ function getDesktopGridStyle(mode) {
     gap: 12,
     width: "100%",
     maxWidth: "100%",
-    minHeight: "calc(100vh - 120px)",
+    alignItems: "start",
   };
 
   if (mode === "Prep") {
     return {
       ...base,
-      gridTemplateColumns: "minmax(520px, 1fr) minmax(420px, 520px)",
-      gridTemplateRows: "auto 1fr 180px",
-      gridTemplateAreas: `"top right" "top right" "bottom bottom"`,
+      gridTemplateColumns: "minmax(320px, 0.9fr) minmax(520px, 1.4fr) minmax(340px, 0.9fr)",
+      gridTemplateAreas: `"top center right" "bottom bottom bottom"`,
     };
   }
 
   if (mode === "Live") {
     return {
       ...base,
-      gridTemplateColumns: "minmax(360px, 440px) minmax(520px, 1fr) minmax(360px, 440px)",
-      gridTemplateRows: "auto 1fr 180px",
-      gridTemplateAreas: `"left top right" "left top right" "bottom bottom bottom"`,
+      gridTemplateColumns: "minmax(320px, 0.9fr) minmax(520px, 1.4fr) minmax(340px, 0.9fr)",
+      gridTemplateAreas: `"left top right" "bottom bottom bottom"`,
     };
   }
 
   if (mode === "After Action") {
     return {
       ...base,
-      gridTemplateColumns: "minmax(620px, 1fr) minmax(420px, 520px)",
-      gridTemplateRows: "auto 1fr 180px",
-      gridTemplateAreas: `"top right" "center right" "bottom bottom"`,
+      gridTemplateColumns: "minmax(320px, 0.9fr) minmax(620px, 1.5fr) minmax(340px, 0.9fr)",
+      gridTemplateAreas: `"top center right" "bottom bottom bottom"`,
     };
   }
 
   return {
     ...base,
-    gridTemplateColumns: "minmax(360px, 440px) minmax(620px, 1fr) minmax(360px, 440px)",
-    gridTemplateRows: "auto 1fr 180px",
-    gridTemplateAreas: `"left top right" "left center right" "bottom bottom bottom"`,
+    gridTemplateColumns: "minmax(320px, 0.85fr) minmax(640px, 1.6fr) minmax(360px, 0.9fr)",
+    gridTemplateAreas: `"left center right" "bottom bottom bottom"`,
   };
 }
 
 const desktopGridStyle = getDesktopGridStyle("Combat");
 const mobileGridStyle = { display: "grid", gridTemplateColumns: "1fr", gap: 12 };
 const mobileSectionStyle = { display: "grid", gap: 12, alignContent: "start", minWidth: 0 };
-const leftColumnStyle = { gridArea: "left", display: "grid", gap: 12, alignContent: "start", minHeight: 0, overflowY: "auto" };
-const topBarStyle = { gridArea: "top", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, alignContent: "start" };
-const centerColumnStyle = { gridArea: "center", minHeight: 0, overflowY: "auto" };
-const rightColumnStyle = { gridArea: "right", display: "grid", gap: 12, alignContent: "start", minHeight: 0, overflowY: "auto" };
-const bottomBarStyle = { gridArea: "bottom", minHeight: 0 };
+const leftColumnStyle = { gridArea: "left", display: "grid", gap: 12, alignContent: "start", minWidth: 0 };
+const topBarStyle = { gridArea: "top", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, alignContent: "start", minWidth: 0 };
+const centerColumnStyle = { gridArea: "center", display: "grid", gap: 12, alignContent: "start", minWidth: 0 };
+const rightColumnStyle = { gridArea: "right", display: "grid", gap: 12, alignContent: "start", minWidth: 0 };
+const bottomBarStyle = { gridArea: "bottom", display: "grid", gap: 12, minWidth: 0 };
 const cardStyle = { background: "#0d1117", border: "1px solid #3b4351", borderRadius: 8, padding: 12, boxSizing: "border-box", minWidth: 0 };
 const innerCardStyle = { background: "#121821", border: "1px solid #303845", borderRadius: 6, padding: 8, marginBottom: 8 };
 const directorCardStyle = { ...innerCardStyle, background: "#151b25", border: "1px solid #8a6d1d" };
