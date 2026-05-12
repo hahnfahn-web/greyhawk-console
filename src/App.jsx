@@ -677,6 +677,7 @@ export default function App() {
 
   const [sessionPrep, setSessionPrep] = useState(() => loadSaved("sessionPrep", ""));
   const [sessionRecap, setSessionRecap] = useState(() => loadSaved("sessionRecap", ""));
+  const [nextSessionTitle, setNextSessionTitle] = useState(() => loadSaved("nextSessionTitle", "TBD"));
   const [prepFocus, setPrepFocus] = useState(() => loadSaved("prepFocus", "Temple of Elemental Evil"));
   const [prepThreat, setPrepThreat] = useState(() => loadSaved("prepThreat", "Earth Cult pressure rises"));
   const [prepLocation, setPrepLocation] = useState(() => loadSaved("prepLocation", "Kron Hills / Temple approaches"));
@@ -708,6 +709,7 @@ export default function App() {
   useEffect(() => localStorage.setItem("npcs", JSON.stringify(npcs)), [npcs]);
   useEffect(() => localStorage.setItem("sessionPrep", JSON.stringify(sessionPrep)), [sessionPrep]);
   useEffect(() => localStorage.setItem("sessionRecap", JSON.stringify(sessionRecap)), [sessionRecap]);
+  useEffect(() => localStorage.setItem("nextSessionTitle", JSON.stringify(nextSessionTitle)), [nextSessionTitle]);
   useEffect(() => localStorage.setItem("prepFocus", JSON.stringify(prepFocus)), [prepFocus]);
   useEffect(() => localStorage.setItem("prepThreat", JSON.stringify(prepThreat)), [prepThreat]);
   useEffect(() => localStorage.setItem("prepLocation", JSON.stringify(prepLocation)), [prepLocation]);
@@ -1511,6 +1513,79 @@ Earth Node Progress: ${nodeProgress}%`;
     postToDiscord("bard-tales", recap);
   };
 
+  const endSessionLifecycle = async () => {
+    const currentSession = Number(calendar.session || 41);
+    const nextSession = currentSession + 1;
+    const recap = sessionRecap || buildSessionRecap();
+    const nextCalendar = {
+      ...calendar,
+      session: nextSession,
+    };
+
+    setSessionRecap(recap);
+    setCalendar(nextCalendar);
+    setEnemies([]);
+    setDefeatedEnemies([]);
+    setEncounterSummary("");
+    setActiveEncounterName("Current Encounter");
+    setRound(1);
+    setTurnIndex(0);
+    setWorkflowMode("Prep");
+    setSessionPrep("");
+    setNextSessionTitle("TBD");
+
+    addLog(`🏁 Session #${currentSession} closed. Session #${nextSession} prepared.`);
+
+    if (!bridgeUrl || !apiKey) {
+      setCloudSyncStatus("End session complete; cloud save skipped");
+      return;
+    }
+
+    try {
+      const nextCampaignState = {
+        party,
+        enemies: [],
+        defeatedEnemies: [],
+        monsterLibrary,
+        turnIndex: 0,
+        round: 1,
+        activeEncounterName: "Current Encounter",
+        encounterSummary: "",
+        npcs,
+        encounterName,
+        savedEncounters,
+        earthCult,
+        dungeonAlert,
+        nodeProgress,
+        calendar: nextCalendar,
+        log,
+      };
+
+      const payload = {
+        savedAt: new Date().toISOString(),
+        campaign: nextCampaignState,
+      };
+
+      const res = await fetch(`${bridgeUrl}/campaign-state`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const status = `Session #${nextSession} prepared and cloud saved ${new Date().toLocaleTimeString()}`;
+      setCloudSyncStatus(status);
+      addLog(`☁️ ${status}.`);
+    } catch (err) {
+      setCloudSyncStatus(`End session cloud save failed: ${err.message}`);
+      addLog(`❌ End session cloud save failed: ${err.message}`);
+    }
+  };
+
   const endEncounter = () => {
     const summary = buildEncounterSummary();
     setEncounterSummary(summary);
@@ -1747,6 +1822,7 @@ Earth Node Progress: ${nodeProgress}%`;
         exportCampaign={exportCampaign}
         generateSessionRecap={generateSessionRecap}
         postSessionRecap={postSessionRecap}
+        endSessionLifecycle={endSessionLifecycle}
         saveCampaignToCloud={saveCampaignToCloud}
         loadCampaignFromCloud={loadCampaignFromCloud}
       />
@@ -1856,11 +1932,18 @@ Earth Node Progress: ${nodeProgress}%`;
               <div style={buttonWrapStyle}>
                 <button style={buttonStyle} onClick={generateSessionRecap}>📜 Generate Recap</button>
                 <button style={buttonStyle} onClick={postSessionRecap}>Post to #bard-tales</button>
+                <button style={buttonStyle} onClick={endSessionLifecycle}>🏁 End Session / Prepare Next</button>
               </div>
               <textarea
                 style={{ ...textAreaStyle, minHeight: 320 }}
                 value={sessionRecap}
                 onChange={(event) => setSessionRecap(event.target.value)}
+              />
+              <input
+                style={inputStyle}
+                placeholder="Next session title"
+                value={nextSessionTitle}
+                onChange={(event) => setNextSessionTitle(event.target.value)}
               />
             </Panel>
           )}
@@ -1991,6 +2074,7 @@ function WorkflowQuickActions({
   exportCampaign,
   generateSessionRecap,
   postSessionRecap,
+  endSessionLifecycle,
   saveCampaignToCloud,
   loadCampaignFromCloud,
 }) {
@@ -2028,6 +2112,7 @@ function WorkflowQuickActions({
     <div style={quickActionsStyle}>
       <button style={quickActionButtonStyle} onClick={generateSessionRecap}>📜 Generate Recap</button>
       <button style={quickActionButtonStyle} onClick={postSessionRecap}>📡 Post Recap</button>
+      <button style={quickActionButtonStyle} onClick={endSessionLifecycle}>🏁 End Session</button>
       <button style={quickActionButtonStyle} onClick={postEncounterSummary}>📡 Post Summary</button>
       <button style={quickActionButtonStyle} onClick={postEncounterLoot}>💰 Post Loot</button>
       <button style={quickActionButtonStyle} onClick={saveCampaign}>💾 Save Campaign</button>
