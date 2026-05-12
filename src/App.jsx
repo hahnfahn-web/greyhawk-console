@@ -631,6 +631,9 @@ export default function App() {
   const [enemyForm, setEnemyForm] = useState({ name: "", hp: "", ac: "", init: "", xp: "" });
   const [monsterLibrary, setMonsterLibrary] = useState(() => loadSaved("monsterLibrary", DEFAULT_MONSTER_LIBRARY));
   const [monsterSearch, setMonsterSearch] = useState("");
+  const [monsterImportQuery, setMonsterImportQuery] = useState("");
+  const [monsterImportResults, setMonsterImportResults] = useState([]);
+  const [monsterImportStatus, setMonsterImportStatus] = useState("");
   const [selectedLibraryMonster, setSelectedLibraryMonster] = useState(null);
   const [monsterEditor, setMonsterEditor] = useState({
     name: "",
@@ -997,6 +1000,117 @@ export default function App() {
   const deleteMonsterFromLibrary = (name) => {
     setMonsterLibrary((prev) => prev.filter((m) => m.name !== name));
     addLog(`🗑️ Monster deleted from library: ${name}.`);
+  };
+
+  const convertOpen5eMonster = (apiMonster) => {
+    const acValue = Array.isArray(apiMonster.armor_class)
+      ? Number(apiMonster.armor_class[0]?.value || apiMonster.armor_class[0] || 10)
+      : Number(apiMonster.armor_class || 10);
+
+    const hpValue = Number(apiMonster.hit_points || 1);
+    const speedText = typeof apiMonster.speed === "string"
+      ? apiMonster.speed
+      : Object.entries(apiMonster.speed || {})
+          .map(([key, value]) => `${key} ${value}`)
+          .join(", ");
+
+    const actions = (apiMonster.actions || []).map((action) => ({
+      name: action.name || "Action",
+      type: action.attack_bonus !== undefined ? "Attack" : "Action",
+      attackBonus: action.attack_bonus,
+      hit: action.damage_dice ? `${action.damage_dice}${action.damage_bonus ? " + " + action.damage_bonus : ""}` : "",
+      effect: action.desc || action.description || "Resolve using source action text.",
+      tactics: "Use when this action best fits the monster's instincts and battlefield position.",
+    }));
+
+    const traits = (apiMonster.special_abilities || apiMonster.traits || []).map((trait) =>
+      trait.desc ? `${trait.name}: ${trait.desc}` : trait.name || String(trait)
+    );
+
+    return normalizeMonster({
+      name: apiMonster.name || "Imported Monster",
+      size: apiMonster.size || "Medium",
+      type: apiMonster.type || "creature",
+      alignment: apiMonster.alignment || "unaligned",
+      hp: hpValue,
+      maxHp: hpValue,
+      ac: acValue,
+      speed: speedText || "30 ft.",
+      init: Number(apiMonster.dexterity ? Math.floor((apiMonster.dexterity - 10) / 2) : 0),
+      xp: Number(apiMonster.xp || 0),
+      attackBonus: Number(actions.find((action) => action.attackBonus !== undefined)?.attackBonus || 3),
+      spellSaveDc: Number(apiMonster.spell_save_dc || 12),
+      spellAttackBonus: Number(apiMonster.spell_attack_bonus || 4),
+      abilities: {
+        str: Number(apiMonster.strength || 10),
+        dex: Number(apiMonster.dexterity || 10),
+        con: Number(apiMonster.constitution || 10),
+        int: Number(apiMonster.intelligence || 10),
+        wis: Number(apiMonster.wisdom || 10),
+        cha: Number(apiMonster.charisma || 10),
+      },
+      saves: apiMonster.saving_throws || "—",
+      skills: apiMonster.skills || "—",
+      senses: apiMonster.senses || `passive Perception ${apiMonster.perception || 10}`,
+      languages: apiMonster.languages || "—",
+      traits,
+      actions: actions.length ? actions : ["Attack", "Dodge", "Disengage", "Flee"],
+      tactics: [
+        `Use ${apiMonster.name || "this monster"} according to its role, terrain, and instincts.`,
+        "Focus isolated or wounded targets when appropriate.",
+        "Use special traits before basic attacks if they change the battlefield.",
+      ],
+      loot: [],
+    });
+  };
+
+  const searchOpen5eMonsters = async () => {
+    const query = monsterImportQuery.trim();
+    if (!query) {
+      setMonsterImportStatus("Enter a monster name to search.");
+      return;
+    }
+
+    setMonsterImportStatus("Searching Open5e...");
+
+    try {
+      const res = await fetch(`https://api.open5e.com/v1/monsters/?search=${encodeURIComponent(query)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const data = await res.json();
+      const results = data.results || [];
+      setMonsterImportResults(results.slice(0, 12));
+      setMonsterImportStatus(`Found ${results.length} result(s).`);
+      addLog(`🔎 Monster search complete: ${query}.`);
+    } catch (err) {
+      setMonsterImportStatus(`Search failed: ${err.message}`);
+      addLog(`❌ Monster search failed: ${err.message}`);
+    }
+  };
+
+  const importOpen5eMonster = (apiMonster, addToEncounter = false) => {
+    const monster = convertOpen5eMonster(apiMonster);
+
+    setMonsterLibrary((prev) => {
+      const existingIndex = prev.findIndex(
+        (entry) => entry.name.toLowerCase() === monster.name.toLowerCase()
+      );
+
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = { ...monster, id: undefined };
+        return updated;
+      }
+
+      return [...prev, { ...monster, id: undefined }];
+    });
+
+    if (addToEncounter) {
+      setEnemies((prev) => [...prev, normalizeMonster({ ...monster, id: Date.now() })]);
+      addLog(`📥 Imported and added ${monster.name} to encounter.`);
+    } else {
+      addLog(`📥 Imported ${monster.name} to Monster Library.`);
+    }
   };
 
   const exportMonsterLibrary = () => {
@@ -1907,6 +2021,12 @@ Earth Node Progress: ${nodeProgress}%`;
                 exportMonsterLibrary={exportMonsterLibrary}
                 importMonsterLibrary={importMonsterLibrary}
                 syncDefaultMonsters={syncDefaultMonsters}
+                monsterImportQuery={monsterImportQuery}
+                setMonsterImportQuery={setMonsterImportQuery}
+                monsterImportResults={monsterImportResults}
+                monsterImportStatus={monsterImportStatus}
+                searchOpen5eMonsters={searchOpen5eMonsters}
+                importOpen5eMonster={importOpen5eMonster}
               />
               <EnemiesPanel enemies={enemies} enemyForm={enemyForm} setEnemyForm={setEnemyForm} addEnemy={addEnemy} updateEnemyHp={updateEnemyHp} removeEnemy={removeEnemy} toggleEnemyCondition={toggleEnemyCondition} saveFormToMonsterLibrary={saveFormToMonsterLibrary} />
             </>
@@ -2431,6 +2551,12 @@ function MonsterLibraryPanel({
   exportMonsterLibrary,
   importMonsterLibrary,
   syncDefaultMonsters,
+  monsterImportQuery,
+  setMonsterImportQuery,
+  monsterImportResults,
+  monsterImportStatus,
+  searchOpen5eMonsters,
+  importOpen5eMonster,
 }) {
   const query = monsterSearch.trim().toLowerCase();
   const filteredMonsters = monsterLibrary.filter((monster) =>
@@ -2439,6 +2565,35 @@ function MonsterLibraryPanel({
 
   return (
     <Panel title="Monster Library">
+      <div style={monsterImporterStyle}>
+        <h3 style={subHeaderStyle}>Monster Importer v1</h3>
+        <div style={buttonWrapStyle}>
+          <input
+            style={{ ...inputStyle, marginBottom: 0, flex: "1 1 220px" }}
+            placeholder="Search Open5e / SRD monsters, e.g. ghoul"
+            value={monsterImportQuery}
+            onChange={(event) => setMonsterImportQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") searchOpen5eMonsters();
+            }}
+          />
+          <button style={buttonStyle} onClick={searchOpen5eMonsters}>🔎 Search</button>
+        </div>
+        <div style={{ fontSize: 12, color: "#cbd5e1", marginTop: 6 }}>{monsterImportStatus}</div>
+        <div style={monsterImportResultsStyle}>
+          {(monsterImportResults || []).map((monster) => (
+            <div key={monster.slug || monster.name} style={innerCardStyle}>
+              <strong>{monster.name}</strong>
+              <div style={{ fontSize: 12, opacity: 0.85 }}>
+                CR {monster.challenge_rating || "?"} | HP {monster.hit_points || "?"} | AC {Array.isArray(monster.armor_class) ? monster.armor_class[0]?.value || monster.armor_class[0] : monster.armor_class || "?"}
+              </div>
+              <button style={smallButtonStyle} onClick={() => importOpen5eMonster(monster, false)}>Import to Library</button>
+              <button style={smallButtonStyle} onClick={() => importOpen5eMonster(monster, true)}>Import + Add</button>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <input
         style={inputStyle}
         placeholder="Search monsters"
@@ -2678,6 +2833,8 @@ const textAreaStyle = { width: "100%", minHeight: 120, padding: 10, marginBottom
 const encounterListStyle = { marginTop: 10, maxHeight: 260, overflowY: "auto" };
 const monsterLibraryListStyle = { marginTop: 10, maxHeight: 320, overflowY: "auto" };
 const monsterEditorPanelStyle = { marginTop: 14, paddingTop: 12, borderTop: "1px solid #374151" };
+const monsterImporterStyle = { marginBottom: 14, paddingBottom: 12, borderBottom: "1px solid #374151" };
+const monsterImportResultsStyle = { marginTop: 8, maxHeight: 220, overflowY: "auto" };
 const logBoxStyle = { maxHeight: 135, overflowY: "auto", fontSize: 13 };
 const linkButtonStyle = { display: "inline-block", textDecoration: "none", color: "#fff", background: "linear-gradient(180deg, #4b5563 0%, #252b34 100%)", border: "1px solid #6b7280", borderRadius: 6, padding: "10px 14px", fontWeight: "bold" };
 const miniGridStyle = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 6 };
