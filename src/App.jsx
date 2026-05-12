@@ -596,6 +596,7 @@ export default function App() {
   const [customMsg, setCustomMsg] = useState("");
   const [workflowMode, setWorkflowMode] = useState(() => loadSaved("workflowMode", "Live"));
   const [cloudSyncStatus, setCloudSyncStatus] = useState(() => loadSaved("cloudSyncStatus", "Not synced yet"));
+  const [autoCloudSave, setAutoCloudSave] = useState(() => loadSaved("autoCloudSave", false));
 
   const [calendar, setCalendar] = useState(() =>
     loadSaved("calendar", {
@@ -689,6 +690,7 @@ export default function App() {
   useEffect(() => localStorage.setItem("channel", JSON.stringify(channel)), [channel]);
   useEffect(() => localStorage.setItem("workflowMode", JSON.stringify(workflowMode)), [workflowMode]);
   useEffect(() => localStorage.setItem("cloudSyncStatus", JSON.stringify(cloudSyncStatus)), [cloudSyncStatus]);
+  useEffect(() => localStorage.setItem("autoCloudSave", JSON.stringify(autoCloudSave)), [autoCloudSave]);
   useEffect(() => localStorage.setItem("calendar", JSON.stringify(calendar)), [calendar]);
   useEffect(() => localStorage.setItem("earthCult", JSON.stringify(earthCult)), [earthCult]);
   useEffect(() => localStorage.setItem("dungeonAlert", JSON.stringify(dungeonAlert)), [dungeonAlert]);
@@ -1594,6 +1596,16 @@ Earth Node Progress: ${nodeProgress}%`;
     }
   };
 
+  useEffect(() => {
+    if (!autoCloudSave) return;
+
+    const interval = setInterval(() => {
+      saveCampaignToCloud();
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, [autoCloudSave, party, enemies, defeatedEnemies, monsterLibrary, turnIndex, round, activeEncounterName, encounterSummary, npcs, encounterName, savedEncounters, earthCult, dungeonAlert, nodeProgress, calendar, log, bridgeUrl, apiKey]);
+
   const importCampaign = (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -1647,7 +1659,13 @@ Earth Node Progress: ${nodeProgress}%`;
   return (
     <div style={pageStyle}>
       <h1 style={isMobile ? mobileTitleStyle : titleStyle}>Greyhawk Command Console v4</h1>
-      <WorkflowBar workflowMode={workflowMode} setWorkflowMode={setWorkflowMode} />
+      <WorkflowBar
+        workflowMode={workflowMode}
+        setWorkflowMode={setWorkflowMode}
+        cloudSyncStatus={cloudSyncStatus}
+        autoCloudSave={autoCloudSave}
+        setAutoCloudSave={setAutoCloudSave}
+      />
       <WorkflowGuide workflowMode={workflowMode} />
       <WorkflowQuickActions
         workflowMode={workflowMode}
@@ -1804,7 +1822,7 @@ Earth Node Progress: ${nodeProgress}%`;
   );
 }
 
-function WorkflowBar({ workflowMode, setWorkflowMode }) {
+function WorkflowBar({ workflowMode, setWorkflowMode, cloudSyncStatus, autoCloudSave, setAutoCloudSave }) {
   const modes = ["Prep", "Live", "Combat", "After Action"];
 
   return (
@@ -1824,7 +1842,16 @@ function WorkflowBar({ workflowMode, setWorkflowMode }) {
           );
         })}
       </div>
-      <div style={workflowStatusStyle}>Current Mode: {workflowMode}</div>
+      <div style={workflowStatusStyle}>
+        <div>Current Mode: {workflowMode}</div>
+        <div>Cloud: {cloudSyncStatus}</div>
+        <button
+          style={autoCloudSave ? workflowMiniButtonActiveStyle : workflowMiniButtonStyle}
+          onClick={() => setAutoCloudSave(!autoCloudSave)}
+        >
+          ☁️ Auto Save: {autoCloudSave ? "ON" : "OFF"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -2392,7 +2419,9 @@ const workflowLabelStyle = { color: "#f2d28b", fontWeight: "bold", textTransform
 const workflowButtonWrapStyle = { display: "flex", flexWrap: "wrap", gap: 6 };
 const workflowButtonStyle = { background: "linear-gradient(180deg, #374151 0%, #1f2937 100%)", color: "#e5e7eb", border: "1px solid #4b5563", borderRadius: 6, padding: "9px 12px", cursor: "pointer", fontSize: 14 };
 const workflowButtonActiveStyle = { ...workflowButtonStyle, background: "linear-gradient(180deg, #8a6d1d 0%, #4a3415 100%)", color: "#fff2b8", border: "1px solid #d6a03d", boxShadow: "0 0 10px rgba(214,160,61,0.35)" };
-const workflowStatusStyle = { color: "#cbd5e1", fontSize: 13 };
+const workflowStatusStyle = { color: "#cbd5e1", fontSize: 13, display: "grid", gap: 4, justifyItems: "end" };
+const workflowMiniButtonStyle = { background: "#1f2937", color: "#e5e7eb", border: "1px solid #4b5563", borderRadius: 6, padding: "5px 8px", cursor: "pointer", fontSize: 12 };
+const workflowMiniButtonActiveStyle = { ...workflowMiniButtonStyle, background: "linear-gradient(180deg, #166534 0%, #14532d 100%)", border: "1px solid #22c55e", color: "#dcfce7" };
 const workflowGuideStyle = { background: "#111827", border: "1px solid #374151", borderRadius: 8, padding: 10, marginBottom: 12 };
 const workflowGuideTitleStyle = { color: "#f2d28b", fontWeight: "bold", marginBottom: 4, textTransform: "uppercase" };
 const workflowGuideTextStyle = { color: "#d1d5db", fontSize: 14, marginBottom: 8 };
