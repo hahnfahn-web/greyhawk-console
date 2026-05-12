@@ -676,6 +676,7 @@ export default function App() {
   });
 
   const [sessionPrep, setSessionPrep] = useState(() => loadSaved("sessionPrep", ""));
+  const [sessionRecap, setSessionRecap] = useState(() => loadSaved("sessionRecap", ""));
   const [prepFocus, setPrepFocus] = useState(() => loadSaved("prepFocus", "Temple of Elemental Evil"));
   const [prepThreat, setPrepThreat] = useState(() => loadSaved("prepThreat", "Earth Cult pressure rises"));
   const [prepLocation, setPrepLocation] = useState(() => loadSaved("prepLocation", "Kron Hills / Temple approaches"));
@@ -706,6 +707,7 @@ export default function App() {
   useEffect(() => localStorage.setItem("selectedActionInfo", JSON.stringify(selectedActionInfo)), [selectedActionInfo]);
   useEffect(() => localStorage.setItem("npcs", JSON.stringify(npcs)), [npcs]);
   useEffect(() => localStorage.setItem("sessionPrep", JSON.stringify(sessionPrep)), [sessionPrep]);
+  useEffect(() => localStorage.setItem("sessionRecap", JSON.stringify(sessionRecap)), [sessionRecap]);
   useEffect(() => localStorage.setItem("prepFocus", JSON.stringify(prepFocus)), [prepFocus]);
   useEffect(() => localStorage.setItem("prepThreat", JSON.stringify(prepThreat)), [prepThreat]);
   useEffect(() => localStorage.setItem("prepLocation", JSON.stringify(prepLocation)), [prepLocation]);
@@ -1445,6 +1447,70 @@ Earth Node Progress: ${nodeProgress}%`;
     ].join(NL);
   };
 
+  const buildSessionRecap = () => {
+    const NL = String.fromCharCode(10);
+    const defeated = defeatedEnemies || [];
+    const totalXp = defeated.reduce((sum, enemy) => sum + Number(enemy.xp || 0), 0);
+    const perPlayer = Math.floor(totalXp / Math.max(party.length, 1));
+    const loot = defeated.flatMap((enemy) => enemy.loot || []);
+    const partyStatus = party.map((pc) => {
+      const conditions = pc.conditions?.length ? " | " + pc.conditions.join(", ") : "";
+      return "• " + pc.name + ": " + pc.hp + "/" + pc.maxHp + " HP" + conditions;
+    }).join(NL);
+    const recentLog = log.slice(0, 12).map((entry) => "• " + entry).join(NL);
+
+    return [
+      "# 📜 Session #" + (calendar.session || 41) + " Recap — The Mouth Beneath the Marsh",
+      "",
+      "**In-Game Time:** " + calendar.date + ", " + calendar.phase + ", " + formatHour(calendar.time),
+      "**Moon:** " + (calendar.moonPhase || "Waxing"),
+      "**Dungeon Turn:** " + (calendar.dungeonTurn || 0),
+      "",
+      "## What Happened",
+      "The party confronted the rootbound horrors rising from the corrupted marsh near the Moathouse. The creatures were destroyed, but their emergence revealed something worse beneath the surface: a torn opening leading down into ghoul-haunted tunnels under the ruins.",
+      "",
+      "## Combat Results",
+      defeated.length ? defeated.map((enemy) => "• Defeated: " + enemy.name).join(NL) : "• No defeated enemies recorded.",
+      "",
+      "## XP",
+      "• Total XP: " + totalXp,
+      "• XP per character: " + perPlayer,
+      "",
+      "## Loot / Discoveries",
+      loot.length ? loot.map((item) => "• " + item).join(NL) : "• No loot recorded.",
+      "• A sinkhole or torn marsh-mouth leads into ghoul tunnels beneath the Moathouse.",
+      "",
+      "## Party Status",
+      partyStatus,
+      "",
+      "## World State Changes",
+      "• Earth Cult Alert: " + earthCult + "/5",
+      "• Dungeon Alert: " + dungeonAlert + "/5",
+      "• Earth Node Progress: " + nodeProgress + "%",
+      "• Root corruption around the Moathouse remains active.",
+      "",
+      "## Open Threads",
+      "• What created or awakened the Rootbound Husks?",
+      "• Where do the ghoul tunnels lead?",
+      "• Why does the bone shard continue to resonate near the Moathouse?",
+      "• Is the Moathouse being swallowed, transformed, or used as a mouth for something below?",
+      "",
+      "## Recent Console Log",
+      recentLog || "• No recent log entries.",
+    ].join(NL);
+  };
+
+  const generateSessionRecap = () => {
+    const recap = buildSessionRecap();
+    setSessionRecap(recap);
+    addLog("📜 Session recap generated.");
+  };
+
+  const postSessionRecap = () => {
+    const recap = sessionRecap || buildSessionRecap();
+    postToDiscord("bard-tales", recap);
+  };
+
   const endEncounter = () => {
     const summary = buildEncounterSummary();
     setEncounterSummary(summary);
@@ -1679,6 +1745,8 @@ Earth Node Progress: ${nodeProgress}%`;
         postEncounterLoot={postEncounterLoot}
         saveCampaign={saveCampaign}
         exportCampaign={exportCampaign}
+        generateSessionRecap={generateSessionRecap}
+        postSessionRecap={postSessionRecap}
         saveCampaignToCloud={saveCampaignToCloud}
         loadCampaignFromCloud={loadCampaignFromCloud}
       />
@@ -1781,6 +1849,20 @@ Earth Node Progress: ${nodeProgress}%`;
               prepLocation={prepLocation}
               setPrepLocation={setPrepLocation}
             />
+          )}
+
+          {workflowMode === "After Action" && (
+            <Panel title="Session Recap">
+              <div style={buttonWrapStyle}>
+                <button style={buttonStyle} onClick={generateSessionRecap}>📜 Generate Recap</button>
+                <button style={buttonStyle} onClick={postSessionRecap}>Post to #bard-tales</button>
+              </div>
+              <textarea
+                style={{ ...textAreaStyle, minHeight: 320 }}
+                value={sessionRecap}
+                onChange={(event) => setSessionRecap(event.target.value)}
+              />
+            </Panel>
           )}
 
           {(workflowMode === "Prep" || workflowMode === "Live" || workflowMode === "After Action") && (
@@ -1907,6 +1989,8 @@ function WorkflowQuickActions({
   postEncounterLoot,
   saveCampaign,
   exportCampaign,
+  generateSessionRecap,
+  postSessionRecap,
   saveCampaignToCloud,
   loadCampaignFromCloud,
 }) {
@@ -1942,6 +2026,8 @@ function WorkflowQuickActions({
 
   return (
     <div style={quickActionsStyle}>
+      <button style={quickActionButtonStyle} onClick={generateSessionRecap}>📜 Generate Recap</button>
+      <button style={quickActionButtonStyle} onClick={postSessionRecap}>📡 Post Recap</button>
       <button style={quickActionButtonStyle} onClick={postEncounterSummary}>📡 Post Summary</button>
       <button style={quickActionButtonStyle} onClick={postEncounterLoot}>💰 Post Loot</button>
       <button style={quickActionButtonStyle} onClick={saveCampaign}>💾 Save Campaign</button>
