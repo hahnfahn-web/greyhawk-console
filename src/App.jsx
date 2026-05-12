@@ -374,6 +374,85 @@ const DEFAULT_MONSTER_LIBRARY = [
   },
 ];
 
+const DEFAULT_WANDERING_TABLES = {
+  "Moathouse / Burial Crypt": [
+    {
+      roll: "1-2",
+      type: "Hostile",
+      name: "Ghoul Feeding Pack",
+      monsters: [{ name: "Ghoul", quantity: 2 }],
+      description: "A wet scraping echoes from the burial niches. Pale shapes crouch over old bones, their jaws working long after the meat is gone. When the light reaches them, four dead eyes turn as one.",
+      dmNotes: "Use if the party is noisy, wounded, or lingering. Ghouls try to paralyze and drag victims into side crypts.",
+    },
+    {
+      roll: "3",
+      type: "Hostile",
+      name: "Root-Twisted Corpse",
+      monsters: [{ name: "Rootbound Husk", quantity: 1 }],
+      description: "Roots push through cracked flagstones and knit themselves around a corpse. The thing rises with mud pouring from its ribs.",
+      dmNotes: "Use as a sign the marsh corruption is spreading downward into the crypts.",
+    },
+    {
+      roll: "4",
+      type: "Non-Hostile",
+      name: "Whispering Burial Niche",
+      monsters: [],
+      description: "A sealed burial niche exhales cold air. Faint voices whisper from behind the stone, repeating a name no one recognizes.",
+      dmNotes: "No combat unless disturbed. DC 13 Religion or Investigation reveals old funerary wards overwritten by elemental marks.",
+    },
+    {
+      roll: "5",
+      type: "Non-Hostile",
+      name: "Lost Cult Sign",
+      monsters: [],
+      description: "A smear of ochre and grave-mud marks the wall: a crude arrow, half-erased by claw marks, pointing deeper beneath the Moathouse.",
+      dmNotes: "Useful clue. Can reveal recent cult movement or a safer route around a hazard.",
+    },
+    {
+      roll: "6",
+      type: "Hostile",
+      name: "Carrion Ambush",
+      monsters: [{ name: "Ghoul", quantity: 4 }],
+      description: "The tunnel ahead is silent until the ceiling soil breaks open and starving dead things drop among the party in a shower of roots and grave dirt.",
+      dmNotes: "Hard encounter. Use if Dungeon Alert is high or the party has ignored warning signs.",
+    },
+  ],
+  "Moathouse Marsh": [
+    {
+      roll: "1-2",
+      type: "Hostile",
+      name: "Rootbound Husk",
+      monsters: [{ name: "Rootbound Husk", quantity: 1 }],
+      description: "The marsh water bulges upward. Reeds bend inward as a root-laced corpse hauls itself from the black mud.",
+      dmNotes: "Use difficult terrain. The husk tries to restrain isolated targets and fight near mud.",
+    },
+    {
+      roll: "3-4",
+      type: "Non-Hostile",
+      name: "Sinking Ground",
+      monsters: [],
+      description: "The ground breathes once beneath the party's boots. Bubbles rise from a patch of black water, carrying the smell of opened graves.",
+      dmNotes: "Hazard or clue. DC 13 Survival avoids unstable ground; failure costs time or causes noise.",
+    },
+    {
+      roll: "5",
+      type: "Non-Hostile",
+      name: "Shard Resonance",
+      monsters: [],
+      description: "The bone shard pulses like a second heartbeat. For a moment, every root nearby points toward the ruined Moathouse.",
+      dmNotes: "Good navigation clue. Reinforces that the shard is pointing toward corruption rather than causing it.",
+    },
+    {
+      roll: "6",
+      type: "Hostile",
+      name: "Cult Scout Pair",
+      monsters: [{ name: "Cultist Acolyte", quantity: 2 }],
+      description: "Two mud-streaked figures crouch among the reeds, whispering prayers into the wet earth. One clutches a black charm and reaches for a blade.",
+      dmNotes: "May flee to warn others if bloodied. Good chance for interrogation if captured.",
+    },
+  ],
+};
+
 const DEFAULT_ENCOUNTERS = [
   {
     name: "Cult Ambush",
@@ -684,6 +763,8 @@ export default function App() {
   const [prepFocus, setPrepFocus] = useState(() => loadSaved("prepFocus", "Temple of Elemental Evil"));
   const [prepThreat, setPrepThreat] = useState(() => loadSaved("prepThreat", "Earth Cult pressure rises"));
   const [prepLocation, setPrepLocation] = useState(() => loadSaved("prepLocation", "Kron Hills / Temple approaches"));
+  const [wanderingLocation, setWanderingLocation] = useState(() => loadSaved("wanderingLocation", "Moathouse / Burial Crypt"));
+  const [wanderingResult, setWanderingResult] = useState(() => loadSaved("wanderingResult", null));
   const [savedEncounters, setSavedEncounters] = useState(() =>
     loadSaved("savedEncounters", DEFAULT_ENCOUNTERS)
   );
@@ -716,6 +797,8 @@ export default function App() {
   useEffect(() => localStorage.setItem("prepFocus", JSON.stringify(prepFocus)), [prepFocus]);
   useEffect(() => localStorage.setItem("prepThreat", JSON.stringify(prepThreat)), [prepThreat]);
   useEffect(() => localStorage.setItem("prepLocation", JSON.stringify(prepLocation)), [prepLocation]);
+  useEffect(() => localStorage.setItem("wanderingLocation", JSON.stringify(wanderingLocation)), [wanderingLocation]);
+  useEffect(() => localStorage.setItem("wanderingResult", JSON.stringify(wanderingResult)), [wanderingResult]);
   useEffect(() => localStorage.setItem("savedEncounters", JSON.stringify(savedEncounters)), [savedEncounters]);
 
   const addLog = (msg) =>
@@ -1327,6 +1410,57 @@ export default function App() {
     const npc = npcs.find((n) => n.id === id);
     setNpcs((prev) => prev.filter((n) => n.id !== id));
     if (npc) addLog(`NPC removed: ${npc.name}.`);
+  };
+
+  const rollWanderingEncounter = () => {
+    const table = DEFAULT_WANDERING_TABLES[wanderingLocation] || [];
+    if (!table.length) {
+      addLog("❌ No wandering encounter table found for this location.");
+      return;
+    }
+
+    const die = Math.floor(Math.random() * 6) + 1;
+    const result = table.find((entry) => {
+      if (entry.roll.includes("-")) {
+        const [min, max] = entry.roll.split("-").map(Number);
+        return die >= min && die <= max;
+      }
+      return Number(entry.roll) === die;
+    }) || table[0];
+
+    const payload = {
+      ...result,
+      die,
+      location: wanderingLocation,
+      rolledAt: new Date().toLocaleTimeString(),
+    };
+
+    setWanderingResult(payload);
+    addLog(`🎲 Wandering encounter rolled: ${wanderingLocation} d6=${die} — ${result.name}.`);
+  };
+
+  const addWanderingMonstersToEncounter = () => {
+    if (!wanderingResult?.monsters?.length) {
+      addLog("ℹ️ Wandering result has no monsters to add.");
+      return;
+    }
+
+    const additions = [];
+
+    wanderingResult.monsters.forEach((entry) => {
+      const source = monsterLibrary.find(
+        (monster) => monster.name.toLowerCase() === entry.name.toLowerCase()
+      );
+
+      for (let i = 0; i < Number(entry.quantity || 1); i += 1) {
+        additions.push(normalizeMonster({ ...(source || { name: entry.name, hp: 10, maxHp: 10, ac: 10, xp: 0 }), id: Date.now() + i }));
+      }
+    });
+
+    setEnemies((prev) => [...prev, ...additions]);
+    setActiveEncounterName(wanderingResult.name);
+    setWorkflowMode("Combat");
+    addLog(`⚔️ Added wandering encounter to combat: ${wanderingResult.name}.`);
   };
 
   const saveCurrentEncounter = () => {
@@ -2032,6 +2166,16 @@ Earth Node Progress: ${nodeProgress}%`;
             </>
           )}
           {(workflowMode === "Prep" || workflowMode === "Live") && (
+            <WanderingEncounterPanel
+              wanderingLocation={wanderingLocation}
+              setWanderingLocation={setWanderingLocation}
+              wanderingResult={wanderingResult}
+              rollWanderingEncounter={rollWanderingEncounter}
+              addWanderingMonstersToEncounter={addWanderingMonstersToEncounter}
+            />
+          )}
+
+          {(workflowMode === "Prep" || workflowMode === "Live") && (
             <SessionPrepGeneratorPanel
               sessionPrep={sessionPrep}
               setSessionPrep={setSessionPrep}
@@ -2417,6 +2561,60 @@ function CombatDirectorPanel({ party, round, active, initiative, turnIndex, next
       </div>
 
       {encounterSummary && <textarea style={{ ...textAreaStyle, minHeight: 220 }} value={encounterSummary} readOnly />}
+    </Panel>
+  );
+}
+
+function WanderingEncounterPanel({
+  wanderingLocation,
+  setWanderingLocation,
+  wanderingResult,
+  rollWanderingEncounter,
+  addWanderingMonstersToEncounter,
+}) {
+  const locations = Object.keys(DEFAULT_WANDERING_TABLES);
+
+  return (
+    <Panel title="Wandering Encounters">
+      <select
+        style={inputStyle}
+        value={wanderingLocation}
+        onChange={(event) => setWanderingLocation(event.target.value)}
+      >
+        {locations.map((location) => (
+          <option key={location} value={location}>{location}</option>
+        ))}
+      </select>
+
+      <button style={buttonStyle} onClick={rollWanderingEncounter}>🎲 Roll Encounter</button>
+
+      {wanderingResult && (
+        <div style={innerCardStyle}>
+          <div style={{ fontSize: 13, color: "#f2d28b" }}>
+            {wanderingResult.location} — d6: {wanderingResult.die} — {wanderingResult.type}
+          </div>
+          <h3 style={subHeaderStyle}>{wanderingResult.name}</h3>
+          <p><strong>Read-Aloud / DM Description:</strong></p>
+          <p>{wanderingResult.description}</p>
+          <p><strong>DM Notes:</strong> {wanderingResult.dmNotes}</p>
+
+          {wanderingResult.monsters?.length > 0 ? (
+            <div>
+              <strong>Monsters:</strong>
+              <ul>
+                {wanderingResult.monsters.map((monster, index) => (
+                  <li key={index}>{monster.quantity}x {monster.name}</li>
+                ))}
+              </ul>
+              <button style={buttonStyle} onClick={addWanderingMonstersToEncounter}>
+                ⚔️ Add to Encounter
+              </button>
+            </div>
+          ) : (
+            <div style={{ color: "#cbd5e1" }}>No hostile monsters. Use as clue, hazard, atmosphere, or roleplay beat.</div>
+          )}
+        </div>
+      )}
     </Panel>
   );
 }
