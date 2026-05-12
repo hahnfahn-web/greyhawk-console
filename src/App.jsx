@@ -595,6 +595,7 @@ export default function App() {
   const [channel, setChannel] = useState(() => loadSaved("channel", "dm-control-room"));
   const [customMsg, setCustomMsg] = useState("");
   const [workflowMode, setWorkflowMode] = useState(() => loadSaved("workflowMode", "Live"));
+  const [cloudSyncStatus, setCloudSyncStatus] = useState(() => loadSaved("cloudSyncStatus", "Not synced yet"));
 
   const [calendar, setCalendar] = useState(() =>
     loadSaved("calendar", {
@@ -687,6 +688,7 @@ export default function App() {
   useEffect(() => localStorage.setItem("apiKey", JSON.stringify(apiKey)), [apiKey]);
   useEffect(() => localStorage.setItem("channel", JSON.stringify(channel)), [channel]);
   useEffect(() => localStorage.setItem("workflowMode", JSON.stringify(workflowMode)), [workflowMode]);
+  useEffect(() => localStorage.setItem("cloudSyncStatus", JSON.stringify(cloudSyncStatus)), [cloudSyncStatus]);
   useEffect(() => localStorage.setItem("calendar", JSON.stringify(calendar)), [calendar]);
   useEffect(() => localStorage.setItem("earthCult", JSON.stringify(earthCult)), [earthCult]);
   useEffect(() => localStorage.setItem("dungeonAlert", JSON.stringify(dungeonAlert)), [dungeonAlert]);
@@ -1510,6 +1512,88 @@ Earth Node Progress: ${nodeProgress}%`;
     addLog("📤 Campaign exported.");
   };
 
+  const saveCampaignToCloud = async () => {
+    if (!bridgeUrl || !apiKey) {
+      addLog("❌ Cloud sync failed: bridge not configured.");
+      setCloudSyncStatus("Cloud save failed: bridge not configured");
+      return;
+    }
+
+    try {
+      const payload = {
+        savedAt: new Date().toISOString(),
+        campaign: getCampaignState(),
+      };
+
+      const res = await fetch(`${bridgeUrl}/campaign-state`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const status = `Cloud saved ${new Date().toLocaleTimeString()}`;
+      setCloudSyncStatus(status);
+      addLog(`☁️ ${status}.`);
+    } catch (err) {
+      setCloudSyncStatus(`Cloud save failed: ${err.message}`);
+      addLog(`❌ Cloud save failed: ${err.message}`);
+    }
+  };
+
+  const loadCampaignFromCloud = async () => {
+    if (!bridgeUrl || !apiKey) {
+      addLog("❌ Cloud sync failed: bridge not configured.");
+      setCloudSyncStatus("Cloud load failed: bridge not configured");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${bridgeUrl}/campaign-state`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const payload = await res.json();
+      const data = payload.campaign || payload;
+
+      setParty(data.party || []);
+      setEnemies(data.enemies || []);
+      setDefeatedEnemies(data.defeatedEnemies || []);
+      setMonsterLibrary(data.monsterLibrary || DEFAULT_MONSTER_LIBRARY);
+      setTurnIndex(data.turnIndex || 0);
+      setRound(data.round || 1);
+      setActiveEncounterName(data.activeEncounterName || "Current Encounter");
+      setEncounterSummary(data.encounterSummary || "");
+      setNpcs(data.npcs || []);
+      setEncounterName(data.encounterName || "");
+      setSavedEncounters(data.savedEncounters || DEFAULT_ENCOUNTERS);
+      setEarthCult(data.earthCult ?? 3);
+      setDungeonAlert(data.dungeonAlert ?? 3);
+      setNodeProgress(data.nodeProgress ?? 35);
+      setCalendar(data.calendar || calendar);
+      setLog(data.log || []);
+
+      const status = payload.savedAt
+        ? `Cloud loaded ${new Date(payload.savedAt).toLocaleString()}`
+        : `Cloud loaded ${new Date().toLocaleTimeString()}`;
+
+      setCloudSyncStatus(status);
+      addLog(`☁️ ${status}.`);
+    } catch (err) {
+      setCloudSyncStatus(`Cloud load failed: ${err.message}`);
+      addLog(`❌ Cloud load failed: ${err.message}`);
+    }
+  };
+
   const importCampaign = (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -1577,6 +1661,8 @@ Earth Node Progress: ${nodeProgress}%`;
         postEncounterLoot={postEncounterLoot}
         saveCampaign={saveCampaign}
         exportCampaign={exportCampaign}
+        saveCampaignToCloud={saveCampaignToCloud}
+        loadCampaignFromCloud={loadCampaignFromCloud}
       />
       <main style={layoutStyle}>
         <div style={leftStyle}>
@@ -1699,6 +1785,9 @@ Earth Node Progress: ${nodeProgress}%`;
               <button style={buttonStyle} onClick={saveCampaign}>💾 Save Campaign</button>
               <button style={buttonStyle} onClick={loadCampaign}>📂 Load Campaign</button>
               <button style={buttonStyle} onClick={exportCampaign}>📤 Export JSON</button>
+              <button style={buttonStyle} onClick={saveCampaignToCloud}>☁️ Save to Cloud</button>
+              <button style={buttonStyle} onClick={loadCampaignFromCloud}>☁️ Load from Cloud</button>
+              <div style={{ fontSize: 12, color: "#cbd5e1", marginTop: 6 }}>Cloud: {cloudSyncStatus}</div>
               <label style={buttonStyle}>📥 Import JSON<input type="file" accept=".json" onChange={importCampaign} style={{ display: "none" }} /></label>
               <button style={dangerButtonStyle} onClick={resetSavedState}>Reset Saved State</button>
             </Panel>
@@ -1791,6 +1880,8 @@ function WorkflowQuickActions({
   postEncounterLoot,
   saveCampaign,
   exportCampaign,
+  saveCampaignToCloud,
+  loadCampaignFromCloud,
 }) {
   if (workflowMode === "Prep") {
     return (
@@ -1827,6 +1918,8 @@ function WorkflowQuickActions({
       <button style={quickActionButtonStyle} onClick={postEncounterSummary}>📡 Post Summary</button>
       <button style={quickActionButtonStyle} onClick={postEncounterLoot}>💰 Post Loot</button>
       <button style={quickActionButtonStyle} onClick={saveCampaign}>💾 Save Campaign</button>
+      <button style={quickActionButtonStyle} onClick={saveCampaignToCloud}>☁️ Save Cloud</button>
+      <button style={quickActionButtonStyle} onClick={loadCampaignFromCloud}>☁️ Load Cloud</button>
       <button style={quickActionButtonStyle} onClick={exportCampaign}>📤 Export Backup</button>
     </div>
   );
