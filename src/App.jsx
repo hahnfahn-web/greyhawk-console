@@ -2563,6 +2563,7 @@ Earth Node Progress: ${nodeProgress}%`;
   const workflowVisible = {
     Prep: { left: false, top: true, center: true, right: true, bottom: true },
     Live: { left: true, top: true, center: false, right: true, bottom: true },
+    Encounters: { left: true, top: false, center: true, right: true, bottom: true },
     Combat: { left: true, top: false, center: true, right: true, bottom: true },
     "After Action": { left: false, top: true, center: true, right: true, bottom: true },
   }[workflowMode] || { left: true, top: true, center: true, right: true, bottom: true };
@@ -2610,6 +2611,37 @@ Earth Node Progress: ${nodeProgress}%`;
           )}
           {workflowMode === "Live" && (
             <NpcPanel npcs={npcs} npcForm={npcForm} setNpcForm={setNpcForm} addNpc={addNpc} removeNpc={removeNpc} />
+          )}
+
+          {workflowMode === "Encounters" && (
+            <WanderingEncounterPanel
+              wanderingTables={wanderingTables}
+              wanderingLocation={wanderingLocation}
+              setWanderingLocation={setWanderingLocation}
+              wanderingResult={wanderingResult}
+              rollWanderingEncounter={rollWanderingEncounter}
+              addWanderingMonstersToEncounter={addWanderingMonstersToEncounter}
+              worldPressure={worldPressure}
+              setWorldPressure={setWorldPressure}
+              wanderingEditor={wanderingEditor}
+              setWanderingEditor={setWanderingEditor}
+              wanderingGenerator={wanderingGenerator}
+              setWanderingGenerator={setWanderingGenerator}
+              generateWanderingEncounter={generateWanderingEncounter}
+              saveWanderingEntry={saveWanderingEntry}
+              editWanderingEntry={editWanderingEntry}
+              deleteWanderingEntry={deleteWanderingEntry}
+              syncWanderingDefaults={syncWanderingDefaults}
+              exportEncounterPack={exportEncounterPack}
+              importEncounterPack={importEncounterPack}
+              encounterPackStatus={encounterPackStatus}
+              sharedPackSearch={sharedPackSearch}
+              setSharedPackSearch={setSharedPackSearch}
+              installSharedEncounterPack={installSharedEncounterPack}
+              packGenerator={packGenerator}
+              setPackGenerator={setPackGenerator}
+              generateEncounterPack={generateEncounterPack}
+            />
           )}
         </div>
 
@@ -2670,13 +2702,13 @@ Earth Node Progress: ${nodeProgress}%`;
             />
           )}
 
-          {(workflowMode === "Prep" || workflowMode === "Combat") && (
+          {(workflowMode === "Prep" || workflowMode === "Encounters" || workflowMode === "Combat") && (
             <EncounterLibraryPanel encounterName={encounterName} setEncounterName={setEncounterName} saveCurrentEncounter={saveCurrentEncounter} savedEncounters={savedEncounters} loadEncounter={loadEncounter} deleteEncounter={deleteEncounter} />
           )}
         </div>
 
         <div style={rightStyle}>
-          {workflowMode === "Combat" && (
+          {(workflowMode === "Encounters" || workflowMode === "Combat") && (
             <>
               <MonsterLibraryPanel
                 monsterLibrary={monsterLibrary}
@@ -2702,7 +2734,7 @@ Earth Node Progress: ${nodeProgress}%`;
               <EnemiesPanel enemies={enemies} enemyForm={enemyForm} setEnemyForm={setEnemyForm} addEnemy={addEnemy} updateEnemyHp={updateEnemyHp} removeEnemy={removeEnemy} toggleEnemyCondition={toggleEnemyCondition} saveFormToMonsterLibrary={saveFormToMonsterLibrary} />
             </>
           )}
-          {(workflowMode === "Prep" || workflowMode === "Live") && (
+          {workflowMode === "Encounters" && (
             <WanderingEncounterPanel
               wanderingTables={wanderingTables}
               wanderingLocation={wanderingLocation}
@@ -2810,7 +2842,7 @@ Earth Node Progress: ${nodeProgress}%`;
 }
 
 function WorkflowBar({ workflowMode, setWorkflowMode, cloudSyncStatus, autoCloudSave, setAutoCloudSave }) {
-  const modes = ["Prep", "Live", "Combat", "After Action"];
+  const modes = ["Prep", "Live", "Encounters", "Combat", "After Action"];
 
   return (
     <div style={workflowBarStyle}>
@@ -2854,6 +2886,11 @@ function WorkflowGuide({ workflowMode }) {
       title: "Live Mode",
       text: "Run exploration, NPC interactions, rumors, time passage, and general table management without the combat panels taking over.",
       steps: ["Track party status", "Update NPCs", "Advance time", "Post notes to Discord"],
+    },
+    Encounters: {
+      title: "Encounters Mode",
+      text: "Build, import, generate, edit, and save monsters, wandering tables, encounter packs, and encounter templates before or during play.",
+      steps: ["Import monsters", "Generate wandering encounters", "Install encounter packs", "Save encounter templates"],
     },
     Combat: {
       title: "Combat Mode",
@@ -2916,6 +2953,16 @@ function WorkflowQuickActions({
         <button style={quickActionButtonStyle} onClick={() => advanceTime(0, 10)}>🕯️ Dungeon Turn +10 Min</button>
         <button style={quickActionButtonStyle} onClick={() => advanceTime(1, 0)}>🕒 +1 Hour</button>
         <button style={quickActionButtonStyle} onClick={() => setWorkflowMode("Combat")}>⚔️ Enter Combat Mode</button>
+      </div>
+    );
+  }
+
+  if (workflowMode === "Encounters") {
+    return (
+      <div style={quickActionsStyle}>
+        <button style={quickActionButtonStyle} onClick={loadCultAmbush}>⚔️ Stage Cult Ambush</button>
+        <button style={quickActionButtonStyle} onClick={() => setWorkflowMode("Combat")}>▶ Run Combat</button>
+        <button style={quickActionButtonStyle} onClick={saveCampaign}>💾 Save Campaign</button>
       </div>
     );
   }
@@ -3743,6 +3790,14 @@ function getDesktopGridStyle(mode) {
       ...base,
       gridTemplateColumns: "minmax(320px, 0.9fr) minmax(520px, 1.4fr) minmax(340px, 0.9fr)",
       gridTemplateAreas: `"left top right" "bottom bottom bottom"`,
+    };
+  }
+
+  if (mode === "Encounters") {
+    return {
+      ...base,
+      gridTemplateColumns: "minmax(360px, 0.85fr) minmax(560px, 1.25fr) minmax(420px, 1fr)",
+      gridTemplateAreas: `"left center right" "bottom bottom bottom"`,
     };
   }
 
