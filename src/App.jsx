@@ -781,6 +781,7 @@ export default function App() {
     tone: "Mixed",
     threat: "Medium",
   }));
+  const [encounterPackStatus, setEncounterPackStatus] = useState(() => loadSaved("encounterPackStatus", "No encounter pack imported yet"));
   const [savedEncounters, setSavedEncounters] = useState(() =>
     loadSaved("savedEncounters", DEFAULT_ENCOUNTERS)
   );
@@ -818,6 +819,7 @@ export default function App() {
   useEffect(() => localStorage.setItem("wanderingResult", JSON.stringify(wanderingResult)), [wanderingResult]);
   useEffect(() => localStorage.setItem("wanderingEditor", JSON.stringify(wanderingEditor)), [wanderingEditor]);
   useEffect(() => localStorage.setItem("wanderingGenerator", JSON.stringify(wanderingGenerator)), [wanderingGenerator]);
+  useEffect(() => localStorage.setItem("encounterPackStatus", JSON.stringify(encounterPackStatus)), [encounterPackStatus]);
   useEffect(() => localStorage.setItem("savedEncounters", JSON.stringify(savedEncounters)), [savedEncounters]);
 
   const addLog = (msg) =>
@@ -1458,6 +1460,91 @@ export default function App() {
       return merged;
     });
     addLog("🔄 Wandering encounter defaults synced.");
+  };
+
+  const exportEncounterPack = () => {
+    const pack = {
+      name: "Greyhawk Wandering Encounter Pack",
+      version: "1.0",
+      exportedAt: new Date().toISOString(),
+      tables: wanderingTables,
+    };
+
+    downloadJSON(pack, "GreyhawkEncounterPack.json");
+    setEncounterPackStatus("Encounter pack exported.");
+    addLog("📤 Encounter pack exported.");
+  };
+
+  const importEncounterPack = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = (loadEvent) => {
+      try {
+        const imported = JSON.parse(loadEvent.target.result);
+        const importedTables = imported.tables || imported;
+
+        if (!importedTables || typeof importedTables !== "object" || Array.isArray(importedTables)) {
+          setEncounterPackStatus("Import failed: pack must contain a tables object.");
+          addLog("❌ Encounter pack import failed: invalid format.");
+          return;
+        }
+
+        let locationCount = 0;
+        let entryCount = 0;
+
+        setWanderingTables((prev) => {
+          const merged = { ...prev };
+
+          Object.entries(importedTables).forEach(([location, entries]) => {
+            if (!Array.isArray(entries)) return;
+
+            locationCount += 1;
+            const current = merged[location] || [];
+            const updated = [...current];
+
+            entries.forEach((entry) => {
+              const cleanEntry = {
+                roll: entry.roll || "1",
+                type: entry.type || "Hostile",
+                name: entry.name || "Unnamed Encounter",
+                monsters: Array.isArray(entry.monsters) ? entry.monsters : [],
+                description: entry.description || "No description provided.",
+                dmNotes: entry.dmNotes || "No DM notes provided.",
+              };
+
+              const existingIndex = updated.findIndex(
+                (item) => item.name.toLowerCase() === cleanEntry.name.toLowerCase()
+              );
+
+              if (existingIndex >= 0) {
+                updated[existingIndex] = cleanEntry;
+              } else {
+                updated.push(cleanEntry);
+              }
+
+              entryCount += 1;
+            });
+
+            merged[location] = updated;
+          });
+
+          return merged;
+        });
+
+        const status = `Imported ${entryCount} encounter(s) across ${locationCount} location(s).`;
+        setEncounterPackStatus(status);
+        addLog(`📥 ${status}`);
+        event.target.value = "";
+      } catch (err) {
+        setEncounterPackStatus(`Import failed: ${err.message}`);
+        addLog(`❌ Encounter pack import failed: ${err.message}`);
+      }
+    };
+
+    reader.readAsText(file);
   };
 
   const saveWanderingEntry = () => {
@@ -2354,6 +2441,9 @@ Earth Node Progress: ${nodeProgress}%`;
               editWanderingEntry={editWanderingEntry}
               deleteWanderingEntry={deleteWanderingEntry}
               syncWanderingDefaults={syncWanderingDefaults}
+              exportEncounterPack={exportEncounterPack}
+              importEncounterPack={importEncounterPack}
+              encounterPackStatus={encounterPackStatus}
             />
           )}
 
@@ -2763,6 +2853,9 @@ function WanderingEncounterPanel({
   editWanderingEntry,
   deleteWanderingEntry,
   syncWanderingDefaults,
+  exportEncounterPack,
+  importEncounterPack,
+  encounterPackStatus,
 }) {
   const locations = Object.keys(wanderingTables);
   const currentTable = wanderingTables[wanderingLocation] || [];
@@ -2819,6 +2912,16 @@ function WanderingEncounterPanel({
       <div style={buttonWrapStyle}>
         <button style={buttonStyle} onClick={rollWanderingEncounter}>🎲 Roll Encounter</button>
         <button style={smallButtonStyle} onClick={syncWanderingDefaults}>🔄 Sync Defaults</button>
+        <button style={smallButtonStyle} onClick={exportEncounterPack}>📤 Export Pack</button>
+        <label style={smallButtonStyle}>
+          📥 Import Pack
+          <input
+            type="file"
+            accept=".json"
+            onChange={importEncounterPack}
+            style={{ display: "none" }}
+          />
+        </label>
       </div>
 
       <div style={wanderingEditorStyle}>
@@ -2887,6 +2990,7 @@ function WanderingEncounterPanel({
           ))
         )}
       </div>
+      <div style={{ fontSize: 12, color: "#cbd5e1", marginTop: 6 }}>Pack: {encounterPackStatus}</div>
 
       {wanderingResult && (
         <div style={innerCardStyle}>
