@@ -763,8 +763,18 @@ export default function App() {
   const [prepFocus, setPrepFocus] = useState(() => loadSaved("prepFocus", "Temple of Elemental Evil"));
   const [prepThreat, setPrepThreat] = useState(() => loadSaved("prepThreat", "Earth Cult pressure rises"));
   const [prepLocation, setPrepLocation] = useState(() => loadSaved("prepLocation", "Kron Hills / Temple approaches"));
+  const [wanderingTables, setWanderingTables] = useState(() => loadSaved("wanderingTables", DEFAULT_WANDERING_TABLES));
   const [wanderingLocation, setWanderingLocation] = useState(() => loadSaved("wanderingLocation", "Moathouse / Burial Crypt"));
   const [wanderingResult, setWanderingResult] = useState(() => loadSaved("wanderingResult", null));
+  const [wanderingEditor, setWanderingEditor] = useState(() => loadSaved("wanderingEditor", {
+    location: "Moathouse / Burial Crypt",
+    roll: "1",
+    type: "Hostile",
+    name: "",
+    monstersText: "",
+    description: "",
+    dmNotes: "",
+  }));
   const [savedEncounters, setSavedEncounters] = useState(() =>
     loadSaved("savedEncounters", DEFAULT_ENCOUNTERS)
   );
@@ -797,8 +807,10 @@ export default function App() {
   useEffect(() => localStorage.setItem("prepFocus", JSON.stringify(prepFocus)), [prepFocus]);
   useEffect(() => localStorage.setItem("prepThreat", JSON.stringify(prepThreat)), [prepThreat]);
   useEffect(() => localStorage.setItem("prepLocation", JSON.stringify(prepLocation)), [prepLocation]);
+  useEffect(() => localStorage.setItem("wanderingTables", JSON.stringify(wanderingTables)), [wanderingTables]);
   useEffect(() => localStorage.setItem("wanderingLocation", JSON.stringify(wanderingLocation)), [wanderingLocation]);
   useEffect(() => localStorage.setItem("wanderingResult", JSON.stringify(wanderingResult)), [wanderingResult]);
+  useEffect(() => localStorage.setItem("wanderingEditor", JSON.stringify(wanderingEditor)), [wanderingEditor]);
   useEffect(() => localStorage.setItem("savedEncounters", JSON.stringify(savedEncounters)), [savedEncounters]);
 
   const addLog = (msg) =>
@@ -1412,8 +1424,93 @@ export default function App() {
     if (npc) addLog(`NPC removed: ${npc.name}.`);
   };
 
+  const parseWanderingMonsterText = (text) => {
+    return (text || "")
+      .split(String.fromCharCode(10))
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const marker = line.toLowerCase().indexOf("x ");
+        if (marker > 0) {
+          const quantity = Number(line.slice(0, marker).trim()) || 1;
+          const name = line.slice(marker + 2).trim();
+          return { quantity, name };
+        }
+        return { quantity: 1, name: line };
+      });
+  };
+
+  const syncWanderingDefaults = () => {
+    setWanderingTables((prev) => {
+      const merged = { ...prev };
+      Object.entries(DEFAULT_WANDERING_TABLES).forEach(([location, entries]) => {
+        if (!merged[location]) {
+          merged[location] = entries;
+        }
+      });
+      return merged;
+    });
+    addLog("🔄 Wandering encounter defaults synced.");
+  };
+
+  const saveWanderingEntry = () => {
+    if (!wanderingEditor.location.trim() || !wanderingEditor.name.trim()) {
+      addLog("❌ Wandering encounter requires location and name.");
+      return;
+    }
+
+    const entry = {
+      roll: wanderingEditor.roll || "1",
+      type: wanderingEditor.type || "Hostile",
+      name: wanderingEditor.name.trim(),
+      monsters: parseWanderingMonsterText(wanderingEditor.monstersText),
+      description: wanderingEditor.description || "No description provided.",
+      dmNotes: wanderingEditor.dmNotes || "No DM notes provided.",
+    };
+
+    const location = wanderingEditor.location.trim();
+
+    setWanderingTables((prev) => {
+      const current = prev[location] || [];
+      const existingIndex = current.findIndex((item) => item.name.toLowerCase() === entry.name.toLowerCase());
+      const updated = [...current];
+
+      if (existingIndex >= 0) {
+        updated[existingIndex] = entry;
+      } else {
+        updated.push(entry);
+      }
+
+      return { ...prev, [location]: updated };
+    });
+
+    setWanderingLocation(location);
+    addLog(`💾 Wandering encounter saved: ${entry.name}.`);
+  };
+
+  const editWanderingEntry = (entry) => {
+    setWanderingEditor({
+      location: wanderingLocation,
+      roll: entry.roll || "1",
+      type: entry.type || "Hostile",
+      name: entry.name || "",
+      monstersText: (entry.monsters || []).map((monster) => `${monster.quantity || 1}x ${monster.name}`).join(String.fromCharCode(10)),
+      description: entry.description || "",
+      dmNotes: entry.dmNotes || "",
+    });
+    addLog(`✏️ Editing wandering encounter: ${entry.name}.`);
+  };
+
+  const deleteWanderingEntry = (entryName) => {
+    setWanderingTables((prev) => ({
+      ...prev,
+      [wanderingLocation]: (prev[wanderingLocation] || []).filter((entry) => entry.name !== entryName),
+    }));
+    addLog(`🗑️ Wandering encounter deleted: ${entryName}.`);
+  };
+
   const rollWanderingEncounter = () => {
-    const table = DEFAULT_WANDERING_TABLES[wanderingLocation] || [];
+    const table = wanderingTables[wanderingLocation] || [];
     if (!table.length) {
       addLog("❌ No wandering encounter table found for this location.");
       return;
@@ -2167,11 +2264,18 @@ Earth Node Progress: ${nodeProgress}%`;
           )}
           {(workflowMode === "Prep" || workflowMode === "Live") && (
             <WanderingEncounterPanel
+              wanderingTables={wanderingTables}
               wanderingLocation={wanderingLocation}
               setWanderingLocation={setWanderingLocation}
               wanderingResult={wanderingResult}
               rollWanderingEncounter={rollWanderingEncounter}
               addWanderingMonstersToEncounter={addWanderingMonstersToEncounter}
+              wanderingEditor={wanderingEditor}
+              setWanderingEditor={setWanderingEditor}
+              saveWanderingEntry={saveWanderingEntry}
+              editWanderingEntry={editWanderingEntry}
+              deleteWanderingEntry={deleteWanderingEntry}
+              syncWanderingDefaults={syncWanderingDefaults}
             />
           )}
 
@@ -2566,13 +2670,21 @@ function CombatDirectorPanel({ party, round, active, initiative, turnIndex, next
 }
 
 function WanderingEncounterPanel({
+  wanderingTables,
   wanderingLocation,
   setWanderingLocation,
   wanderingResult,
   rollWanderingEncounter,
   addWanderingMonstersToEncounter,
+  wanderingEditor,
+  setWanderingEditor,
+  saveWanderingEntry,
+  editWanderingEntry,
+  deleteWanderingEntry,
+  syncWanderingDefaults,
 }) {
-  const locations = Object.keys(DEFAULT_WANDERING_TABLES);
+  const locations = Object.keys(wanderingTables);
+  const currentTable = wanderingTables[wanderingLocation] || [];
 
   return (
     <Panel title="Wandering Encounters">
@@ -2586,7 +2698,77 @@ function WanderingEncounterPanel({
         ))}
       </select>
 
-      <button style={buttonStyle} onClick={rollWanderingEncounter}>🎲 Roll Encounter</button>
+      <div style={buttonWrapStyle}>
+        <button style={buttonStyle} onClick={rollWanderingEncounter}>🎲 Roll Encounter</button>
+        <button style={smallButtonStyle} onClick={syncWanderingDefaults}>🔄 Sync Defaults</button>
+      </div>
+
+      <div style={wanderingEditorStyle}>
+        <h3 style={subHeaderStyle}>Table Editor</h3>
+        <input
+          style={inputStyle}
+          placeholder="Location"
+          value={wanderingEditor.location}
+          onChange={(event) => setWanderingEditor({ ...wanderingEditor, location: event.target.value })}
+        />
+        <div style={miniGridStyle}>
+          <input
+            style={inputStyle}
+            placeholder="Roll, e.g. 1 or 1-2"
+            value={wanderingEditor.roll}
+            onChange={(event) => setWanderingEditor({ ...wanderingEditor, roll: event.target.value })}
+          />
+          <select
+            style={inputStyle}
+            value={wanderingEditor.type}
+            onChange={(event) => setWanderingEditor({ ...wanderingEditor, type: event.target.value })}
+          >
+            <option>Hostile</option>
+            <option>Non-Hostile</option>
+          </select>
+        </div>
+        <input
+          style={inputStyle}
+          placeholder="Encounter name"
+          value={wanderingEditor.name}
+          onChange={(event) => setWanderingEditor({ ...wanderingEditor, name: event.target.value })}
+        />
+        <textarea
+          style={textAreaStyle}
+          placeholder={'Monsters, one per line, e.g. 4x Ghoul'}
+          value={wanderingEditor.monstersText}
+          onChange={(event) => setWanderingEditor({ ...wanderingEditor, monstersText: event.target.value })}
+        />
+        <textarea
+          style={textAreaStyle}
+          placeholder="Read-aloud / DM description"
+          value={wanderingEditor.description}
+          onChange={(event) => setWanderingEditor({ ...wanderingEditor, description: event.target.value })}
+        />
+        <textarea
+          style={textAreaStyle}
+          placeholder="DM notes"
+          value={wanderingEditor.dmNotes}
+          onChange={(event) => setWanderingEditor({ ...wanderingEditor, dmNotes: event.target.value })}
+        />
+        <button style={buttonStyle} onClick={saveWanderingEntry}>💾 Save Table Entry</button>
+      </div>
+
+      <div style={wanderingTableListStyle}>
+        <h3 style={subHeaderStyle}>Current Table</h3>
+        {currentTable.length === 0 ? (
+          <div style={{ opacity: 0.75 }}>No entries for this location yet.</div>
+        ) : (
+          currentTable.map((entry) => (
+            <div key={`${entry.roll}-${entry.name}`} style={innerCardStyle}>
+              <strong>{entry.roll}: {entry.name}</strong>
+              <div style={{ fontSize: 12, color: entry.type === "Hostile" ? "#fca5a5" : "#93c5fd" }}>{entry.type}</div>
+              <button style={smallButtonStyle} onClick={() => editWanderingEntry(entry)}>✏️ Edit</button>
+              <button style={dangerButtonStyle} onClick={() => deleteWanderingEntry(entry.name)}>Delete</button>
+            </div>
+          ))
+        )}
+      </div>
 
       {wanderingResult && (
         <div style={innerCardStyle}>
@@ -3033,6 +3215,8 @@ const monsterLibraryListStyle = { marginTop: 10, maxHeight: 320, overflowY: "aut
 const monsterEditorPanelStyle = { marginTop: 14, paddingTop: 12, borderTop: "1px solid #374151" };
 const monsterImporterStyle = { marginBottom: 14, paddingBottom: 12, borderBottom: "1px solid #374151" };
 const monsterImportResultsStyle = { marginTop: 8, maxHeight: 220, overflowY: "auto" };
+const wanderingEditorStyle = { marginTop: 12, paddingTop: 12, borderTop: "1px solid #374151" };
+const wanderingTableListStyle = { marginTop: 12, maxHeight: 260, overflowY: "auto" };
 const logBoxStyle = { maxHeight: 135, overflowY: "auto", fontSize: 13 };
 const linkButtonStyle = { display: "inline-block", textDecoration: "none", color: "#fff", background: "linear-gradient(180deg, #4b5563 0%, #252b34 100%)", border: "1px solid #6b7280", borderRadius: 6, padding: "10px 14px", fontWeight: "bold" };
 const miniGridStyle = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 6 };
