@@ -818,6 +818,32 @@ export default function App() {
   const [workflowMode, setWorkflowMode] = useState(() => loadSaved("workflowMode", "Live"));
   const [cloudSyncStatus, setCloudSyncStatus] = useState(() => loadSaved("cloudSyncStatus", "Not synced yet"));
   const [autoCloudSave, setAutoCloudSave] = useState(() => loadSaved("autoCloudSave", false));
+  const [moduleScenes, setModuleScenes] = useState(() => loadSaved("moduleScenes", [
+    {
+      id: "moathouse-burial-crypt",
+      module: "T1-4",
+      name: "Moathouse Burial Crypt",
+      location: "Moathouse Dungeon",
+      tags: ["undead", "crypt", "ghouls", "moathouse"],
+      readAloud: "The passage narrows into old stone and colder air. Damp earth gives way to the sour stench of rot and burial dust. Ancient alcoves and cracked stonework crowd the chamber ahead. Four pale shapes squat in the gloom, froth bubbling at their mouths as their heads turn toward the living.",
+      notes: [
+        "Rapp's Divine Sense confirms four undead presences immediately.",
+        "The creatures are feeding or crouched among disturbed burial remains.",
+        "The ghouls try to paralyze isolated characters and drag victims toward side niches or lower tunnels.",
+        "The chamber should feel like the threshold between the known Moathouse and something older below.",
+        "Scrape marks, clawed stone, and disturbed bones point deeper into the ghoul tunnels.",
+      ],
+      monsters: [
+        { name: "Ghoul", quantity: 4 },
+      ],
+      treasure: "Tarnished funerary rings, burial tokens, cracked bone charms, and signs of recent victims dragged deeper below.",
+      exits: [
+        "Back toward the upper Moathouse dungeon",
+        "A deeper passage descending into ghoul tunnels beneath the crypt",
+      ],
+    },
+  ]));
+  const [selectedSceneId, setSelectedSceneId] = useState(() => loadSaved("selectedSceneId", "moathouse-burial-crypt"));
 
   const [calendar, setCalendar] = useState(() =>
     loadSaved("calendar", {
@@ -948,6 +974,8 @@ export default function App() {
   useEffect(() => localStorage.setItem("workflowMode", JSON.stringify(workflowMode)), [workflowMode]);
   useEffect(() => localStorage.setItem("cloudSyncStatus", JSON.stringify(cloudSyncStatus)), [cloudSyncStatus]);
   useEffect(() => localStorage.setItem("autoCloudSave", JSON.stringify(autoCloudSave)), [autoCloudSave]);
+  useEffect(() => localStorage.setItem("moduleScenes", JSON.stringify(moduleScenes)), [moduleScenes]);
+  useEffect(() => localStorage.setItem("selectedSceneId", JSON.stringify(selectedSceneId)), [selectedSceneId]);
   useEffect(() => localStorage.setItem("calendar", JSON.stringify(calendar)), [calendar]);
   useEffect(() => localStorage.setItem("earthCult", JSON.stringify(earthCult)), [earthCult]);
   useEffect(() => localStorage.setItem("dungeonAlert", JSON.stringify(dungeonAlert)), [dungeonAlert]);
@@ -1006,6 +1034,8 @@ export default function App() {
     dungeonAlert,
     nodeProgress,
     worldPressure,
+    moduleScenes,
+    selectedSceneId,
     calendar,
     log,
   });
@@ -1257,6 +1287,32 @@ export default function App() {
 
     setMonsterLibrary((prev) => [...prev, { ...newMonster, id: undefined }]);
     addLog(`📚 Saved new monster: ${newMonster.name}.`);
+  };
+
+  const activeScene = moduleScenes.find((scene) => scene.id === selectedSceneId) || moduleScenes[0];
+
+  const addSceneMonstersToEncounter = (scene) => {
+    if (!scene?.monsters?.length) {
+      addLog("ℹ️ Module scene has no monsters to add.");
+      return;
+    }
+
+    const additions = [];
+
+    scene.monsters.forEach((entry) => {
+      const source = monsterLibrary.find(
+        (monster) => monster.name.toLowerCase() === entry.name.toLowerCase()
+      );
+
+      for (let index = 0; index < Number(entry.quantity || 1); index += 1) {
+        additions.push(normalizeMonster({ ...(source || { name: entry.name, hp: 22, maxHp: 22, ac: 12, xp: 200 }), id: Date.now() + index }));
+      }
+    });
+
+    setEnemies((prev) => [...prev, ...additions]);
+    setActiveEncounterName(scene.name || "Module Encounter");
+    setWorkflowMode("Combat");
+    addLog(`📚 Module scene loaded into combat: ${scene.name}.`);
   };
 
   const deleteMonsterFromLibrary = (name) => {
@@ -2417,6 +2473,8 @@ Earth Node Progress: ${nodeProgress}%`;
       setDungeonAlert(data.dungeonAlert ?? 3);
       setNodeProgress(data.nodeProgress ?? 35);
       setWorldPressure(data.worldPressure || { earthCorruption: 45, moathouseStability: 2, wildernessDanger: 3 });
+      setModuleScenes(data.moduleScenes || moduleScenes);
+      setSelectedSceneId(data.selectedSceneId || "moathouse-burial-crypt");
       setCalendar(data.calendar || calendar);
       setLog(data.log || []);
       addLog("📂 Campaign loaded.");
@@ -2564,6 +2622,7 @@ Earth Node Progress: ${nodeProgress}%`;
     Prep: { left: false, top: true, center: true, right: true, bottom: true },
     Live: { left: true, top: true, center: false, right: true, bottom: true },
     Encounters: { left: true, top: false, center: true, right: true, bottom: true },
+    Modules: { left: true, top: false, center: true, right: true, bottom: true },
     Combat: { left: true, top: false, center: true, right: true, bottom: true },
     "After Action": { left: false, top: true, center: true, right: true, bottom: true },
   }[workflowMode] || { left: true, top: true, center: true, right: true, bottom: true };
@@ -2643,6 +2702,16 @@ Earth Node Progress: ${nodeProgress}%`;
               generateEncounterPack={generateEncounterPack}
             />
           )}
+
+          {workflowMode === "Modules" && (
+            <ModuleReferencePanel
+              moduleScenes={moduleScenes}
+              selectedSceneId={selectedSceneId}
+              setSelectedSceneId={setSelectedSceneId}
+              activeScene={activeScene}
+              addSceneMonstersToEncounter={addSceneMonstersToEncounter}
+            />
+          )}
         </div>
 
         <div style={topStyle}>
@@ -2702,13 +2771,13 @@ Earth Node Progress: ${nodeProgress}%`;
             />
           )}
 
-          {(workflowMode === "Prep" || workflowMode === "Encounters" || workflowMode === "Combat") && (
+          {(workflowMode === "Prep" || workflowMode === "Encounters" || workflowMode === "Modules" || workflowMode === "Combat") && (
             <EncounterLibraryPanel encounterName={encounterName} setEncounterName={setEncounterName} saveCurrentEncounter={saveCurrentEncounter} savedEncounters={savedEncounters} loadEncounter={loadEncounter} deleteEncounter={deleteEncounter} />
           )}
         </div>
 
         <div style={rightStyle}>
-          {(workflowMode === "Encounters" || workflowMode === "Combat") && (
+          {(workflowMode === "Encounters" || workflowMode === "Modules" || workflowMode === "Combat") && (
             <>
               <MonsterLibraryPanel
                 monsterLibrary={monsterLibrary}
@@ -2842,7 +2911,7 @@ Earth Node Progress: ${nodeProgress}%`;
 }
 
 function WorkflowBar({ workflowMode, setWorkflowMode, cloudSyncStatus, autoCloudSave, setAutoCloudSave }) {
-  const modes = ["Prep", "Live", "Encounters", "Combat", "After Action"];
+  const modes = ["Prep", "Live", "Encounters", "Modules", "Combat", "After Action"];
 
   return (
     <div style={workflowBarStyle}>
@@ -2891,6 +2960,11 @@ function WorkflowGuide({ workflowMode }) {
       title: "Encounters Mode",
       text: "Build, import, generate, edit, and save monsters, wandering tables, encounter packs, and encounter templates before or during play.",
       steps: ["Import monsters", "Generate wandering encounters", "Install encounter packs", "Save encounter templates"],
+    },
+    Modules: {
+      title: "Modules Mode",
+      text: "Reference module scenes, review DM notes, import monsters, and launch prepared adventure scenes directly into combat.",
+      steps: ["Select a scene", "Review read-aloud and notes", "Add scene monsters", "Start combat"],
     },
     Combat: {
       title: "Combat Mode",
@@ -2962,6 +3036,16 @@ function WorkflowQuickActions({
       <div style={quickActionsStyle}>
         <button style={quickActionButtonStyle} onClick={loadCultAmbush}>⚔️ Stage Cult Ambush</button>
         <button style={quickActionButtonStyle} onClick={() => setWorkflowMode("Combat")}>▶ Run Combat</button>
+        <button style={quickActionButtonStyle} onClick={saveCampaign}>💾 Save Campaign</button>
+      </div>
+    );
+  }
+
+  if (workflowMode === "Modules") {
+    return (
+      <div style={quickActionsStyle}>
+        <button style={quickActionButtonStyle} onClick={() => setWorkflowMode("Encounters")}>📚 Build Encounters</button>
+        <button style={quickActionButtonStyle} onClick={() => setWorkflowMode("Combat")}>⚔️ Go to Combat</button>
         <button style={quickActionButtonStyle} onClick={saveCampaign}>💾 Save Campaign</button>
       </div>
     );
@@ -3166,6 +3250,83 @@ function CombatDirectorPanel({ party, round, active, initiative, turnIndex, next
       </div>
 
       {encounterSummary && <textarea style={{ ...textAreaStyle, minHeight: 220 }} value={encounterSummary} readOnly />}
+    </Panel>
+  );
+}
+
+function ModuleReferencePanel({
+  moduleScenes,
+  selectedSceneId,
+  setSelectedSceneId,
+  activeScene,
+  addSceneMonstersToEncounter,
+}) {
+  return (
+    <Panel title="Module Reference">
+      <select
+        style={inputStyle}
+        value={selectedSceneId}
+        onChange={(event) => setSelectedSceneId(event.target.value)}
+      >
+        {moduleScenes.map((scene) => (
+          <option key={scene.id} value={scene.id}>
+            {scene.module} — {scene.name}
+          </option>
+        ))}
+      </select>
+
+      {activeScene && (
+        <div style={innerCardStyle}>
+          <h3 style={subHeaderStyle}>{activeScene.name}</h3>
+          <div style={{ fontSize: 12, color: "#cbd5e1", marginBottom: 8 }}>
+            {activeScene.module} • {activeScene.location}
+          </div>
+
+          <div style={moduleReadAloudStyle}>
+            <strong>Read-Aloud</strong>
+            <p>{activeScene.readAloud}</p>
+          </div>
+
+          <div style={{ marginTop: 10 }}>
+            <strong>DM Notes</strong>
+            <ul>
+              {(activeScene.notes || []).map((note, index) => (
+                <li key={index}>{note}</li>
+              ))}
+            </ul>
+          </div>
+
+          <div style={{ marginTop: 10 }}>
+            <strong>Monsters</strong>
+            {(activeScene.monsters || []).length > 0 ? (
+              <ul>
+                {activeScene.monsters.map((monster, index) => (
+                  <li key={index}>{monster.quantity || 1}x {monster.name}</li>
+                ))}
+              </ul>
+            ) : (
+              <div>No monsters listed.</div>
+            )}
+            <button style={buttonStyle} onClick={() => addSceneMonstersToEncounter(activeScene)}>
+              ⚔️ Add Scene Monsters / Start Combat
+            </button>
+          </div>
+
+          <div style={{ marginTop: 10 }}>
+            <strong>Treasure / Clues</strong>
+            <p>{activeScene.treasure}</p>
+          </div>
+
+          <div style={{ marginTop: 10 }}>
+            <strong>Exits</strong>
+            <ul>
+              {(activeScene.exits || []).map((exit, index) => (
+                <li key={index}>{exit}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
     </Panel>
   );
 }
@@ -3801,6 +3962,14 @@ function getDesktopGridStyle(mode) {
     };
   }
 
+  if (mode === "Modules") {
+    return {
+      ...base,
+      gridTemplateColumns: "minmax(360px, 0.9fr) minmax(560px, 1.3fr) minmax(420px, 1fr)",
+      gridTemplateAreas: `"left center right" "bottom bottom bottom"`,
+    };
+  }
+
   if (mode === "After Action") {
     return {
       ...base,
@@ -3858,6 +4027,7 @@ const wanderingGeneratorStyle = { marginBottom: 12, paddingBottom: 12, borderBot
 const wanderingTableListStyle = { marginTop: 12, maxHeight: 260, overflowY: "auto" };
 const sharedPackListStyle = { marginTop: 8, maxHeight: 260, overflowY: "auto" };
 const worldPressureMiniStyle = { marginBottom: 12, padding: 10, background: "#141b26", border: "1px solid #8a6d1d", borderRadius: 6 };
+const moduleReadAloudStyle = { padding: 12, background: "#101827", border: "1px solid #d6a03d", borderRadius: 6, marginTop: 8, color: "#f8fafc" };
 const logBoxStyle = { maxHeight: 135, overflowY: "auto", fontSize: 13 };
 const linkButtonStyle = { display: "inline-block", textDecoration: "none", color: "#fff", background: "linear-gradient(180deg, #4b5563 0%, #252b34 100%)", border: "1px solid #6b7280", borderRadius: 6, padding: "10px 14px", fontWeight: "bold" };
 const miniGridStyle = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 6 };
