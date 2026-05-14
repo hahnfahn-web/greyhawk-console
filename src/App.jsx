@@ -782,6 +782,12 @@ export default function App() {
     threat: "Medium",
   }));
   const [encounterPackStatus, setEncounterPackStatus] = useState(() => loadSaved("encounterPackStatus", "No encounter pack imported yet"));
+  const [packGenerator, setPackGenerator] = useState(() => loadSaved("packGenerator", {
+    theme: "Gnarley Forest",
+    environment: "Ancient Forest",
+    threat: "Medium",
+    tone: "Mixed",
+  }));
   const [savedEncounters, setSavedEncounters] = useState(() =>
     loadSaved("savedEncounters", DEFAULT_ENCOUNTERS)
   );
@@ -820,6 +826,7 @@ export default function App() {
   useEffect(() => localStorage.setItem("wanderingEditor", JSON.stringify(wanderingEditor)), [wanderingEditor]);
   useEffect(() => localStorage.setItem("wanderingGenerator", JSON.stringify(wanderingGenerator)), [wanderingGenerator]);
   useEffect(() => localStorage.setItem("encounterPackStatus", JSON.stringify(encounterPackStatus)), [encounterPackStatus]);
+  useEffect(() => localStorage.setItem("packGenerator", JSON.stringify(packGenerator)), [packGenerator]);
   useEffect(() => localStorage.setItem("savedEncounters", JSON.stringify(savedEncounters)), [savedEncounters]);
 
   const addLog = (msg) =>
@@ -1460,6 +1467,77 @@ export default function App() {
       return merged;
     });
     addLog("🔄 Wandering encounter defaults synced.");
+  };
+
+  const generateEncounterPack = () => {
+    const theme = packGenerator.theme.trim() || "Unknown Region";
+    const environment = packGenerator.environment || "Wilderness";
+    const threat = packGenerator.threat || "Medium";
+    const tone = packGenerator.tone || "Mixed";
+
+    const hostilePool = monsterLibrary.filter((monster) => {
+      const name = monster.name.toLowerCase();
+      if (theme.toLowerCase().includes("forest")) {
+        return name.includes("wolf") || name.includes("spider") || name.includes("goblin") || name.includes("cult") || name.includes("husk");
+      }
+      if (theme.toLowerCase().includes("crypt") || theme.toLowerCase().includes("moathouse")) {
+        return name.includes("ghoul") || name.includes("skeleton") || name.includes("zombie") || name.includes("husk");
+      }
+      return true;
+    });
+
+    const fallback = hostilePool.length ? hostilePool : monsterLibrary.slice(0, 8);
+
+    const quantityOptions = threat === "Low" ? [1, 2] : threat === "High" ? [3, 4, 5] : [2, 3, 4];
+
+    const generatedEntries = [];
+
+    for (let i = 0; i < 6; i += 1) {
+      const hostile = tone === "Hostile"
+        ? true
+        : tone === "Non-Hostile"
+          ? false
+          : Math.random() < 0.6;
+
+      if (hostile) {
+        const monster = chooseRandom(fallback);
+        const quantity = chooseRandom(quantityOptions);
+
+        generatedEntries.push({
+          roll: `${i + 1}`,
+          type: "Hostile",
+          name: `${monster.name} Patrol`,
+          monsters: [{ name: monster.name, quantity }],
+          description: `The ${environment.toLowerCase()} grows tense and watchful. ${quantity} ${monster.name}${quantity > 1 ? "s" : ""} emerge from concealment, reacting to the party's presence with immediate hostility.`,
+          dmNotes: `Threat: ${threat}. Use terrain and visibility from ${environment}. Allow scouting or stealth if the party is cautious.`,
+        });
+      } else {
+        generatedEntries.push({
+          roll: `${i + 1}`,
+          type: "Non-Hostile",
+          name: chooseRandom([
+            "Old Warning Marker",
+            "Abandoned Camp",
+            "Whispering Wind",
+            "Broken Shrine",
+            "Distant Movement",
+            "Strange Tracks",
+          ]),
+          monsters: [],
+          description: `The ${environment.toLowerCase()} reveals signs of deeper danger rather than immediate attack. Something here suggests movement, corruption, fear, or forgotten history.`,
+          dmNotes: `Use this encounter to reinforce atmosphere, foreshadow future threats, or reveal clues tied to ${theme}.`,
+        });
+      }
+    }
+
+    setWanderingTables((prev) => ({
+      ...prev,
+      [theme]: generatedEntries,
+    }));
+
+    setWanderingLocation(theme);
+    setEncounterPackStatus(`Generated encounter pack: ${theme}`);
+    addLog(`✨ Generated encounter pack for ${theme}.`);
   };
 
   const exportEncounterPack = () => {
@@ -2444,6 +2522,9 @@ Earth Node Progress: ${nodeProgress}%`;
               exportEncounterPack={exportEncounterPack}
               importEncounterPack={importEncounterPack}
               encounterPackStatus={encounterPackStatus}
+              packGenerator={packGenerator}
+              setPackGenerator={setPackGenerator}
+              generateEncounterPack={generateEncounterPack}
             />
           )}
 
@@ -2856,12 +2937,52 @@ function WanderingEncounterPanel({
   exportEncounterPack,
   importEncounterPack,
   encounterPackStatus,
+  packGenerator,
+  setPackGenerator,
+  generateEncounterPack,
 }) {
   const locations = Object.keys(wanderingTables);
   const currentTable = wanderingTables[wanderingLocation] || [];
 
   return (
     <Panel title="Wandering Encounters">
+      <div style={wanderingGeneratorStyle}>
+        <h3 style={subHeaderStyle}>Open Encounter Pack Generator</h3>
+        <input
+          style={inputStyle}
+          placeholder="Theme / Region, e.g. Gnarley Forest"
+          value={packGenerator.theme}
+          onChange={(event) => setPackGenerator({ ...packGenerator, theme: event.target.value })}
+        />
+        <div style={miniGridStyle}>
+          <input
+            style={inputStyle}
+            placeholder="Environment"
+            value={packGenerator.environment}
+            onChange={(event) => setPackGenerator({ ...packGenerator, environment: event.target.value })}
+          />
+          <select
+            style={inputStyle}
+            value={packGenerator.threat}
+            onChange={(event) => setPackGenerator({ ...packGenerator, threat: event.target.value })}
+          >
+            <option>Low</option>
+            <option>Medium</option>
+            <option>High</option>
+          </select>
+        </div>
+        <select
+          style={inputStyle}
+          value={packGenerator.tone}
+          onChange={(event) => setPackGenerator({ ...packGenerator, tone: event.target.value })}
+        >
+          <option>Mixed</option>
+          <option>Hostile</option>
+          <option>Non-Hostile</option>
+        </select>
+        <button style={buttonStyle} onClick={generateEncounterPack}>✨ Generate Encounter Pack</button>
+      </div>
+
       <div style={wanderingGeneratorStyle}>
         <h3 style={subHeaderStyle}>Encounter Generator v2</h3>
         <input
