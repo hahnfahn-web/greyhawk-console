@@ -374,6 +374,148 @@ const DEFAULT_MONSTER_LIBRARY = [
   },
 ];
 
+const SHARED_ENCOUNTER_PACKS = [
+  {
+    name: "Gnarley Forest Pack",
+    version: "1.0",
+    description: "Ancient woodland travel, old druidic markers, beasts, goblins, and cult signs beneath the boughs.",
+    tables: {
+      "Gnarley Forest": [
+        {
+          roll: "1",
+          type: "Hostile",
+          name: "Thorn-Driven Wolves",
+          monsters: [{ name: "Wolf", quantity: 3 }],
+          description: "The undergrowth parts without wind. Wolves emerge low to the ground, their eyes reflecting green-gold in the dim forest light.",
+          dmNotes: "Use trees and brush for cover. Wolves test the party first, then commit if someone is isolated.",
+        },
+        {
+          roll: "2",
+          type: "Hostile",
+          name: "Spider-Webbed Hollow",
+          monsters: [{ name: "Giant Spider", quantity: 2 }],
+          description: "The trail narrows beneath sagging branches heavy with old webbing. Something above shifts, and the leaves stop moving.",
+          dmNotes: "Let passive Perception notice webbing. Failure gives the spiders advantageous positioning.",
+        },
+        {
+          roll: "3",
+          type: "Non-Hostile",
+          name: "Old Druidic Warning Stones",
+          monsters: [],
+          description: "Three moss-covered stones stand around a dead sapling. Each is carved with a weathered sign of warning, half-hidden beneath ivy.",
+          dmNotes: "DC 13 Nature or Religion reveals the stones mark a boundary against corruption or old burial ground.",
+        },
+        {
+          roll: "4",
+          type: "Non-Hostile",
+          name: "The Silent Stag",
+          monsters: [],
+          description: "A white stag watches from between two black-barked trees. Strips of old prayer cloth hang from its antlers like faded banners.",
+          dmNotes: "Omen encounter. Following it can lead to a clue, shrine, safe path, or corrupted grove.",
+        },
+        {
+          roll: "5",
+          type: "Hostile",
+          name: "Goblin Tree-Skulks",
+          monsters: [{ name: "Goblin", quantity: 4 }],
+          description: "A twig snaps overhead. Small shapes move among the branches, and crude arrows whisper down through the leaves.",
+          dmNotes: "Use hit-and-run tactics. Goblins flee if reduced to half numbers.",
+        },
+        {
+          roll: "6",
+          type: "Hostile",
+          name: "Rootbound Forest Corpse",
+          monsters: [{ name: "Rootbound Husk", quantity: 1 }],
+          description: "Roots writhe through a fallen tree and pull a dead thing upright. Bark, bone, and mud move together as one body.",
+          dmNotes: "Use as evidence that Moathouse corruption is spreading beyond the marsh.",
+        },
+      ],
+    },
+  },
+  {
+    name: "Temple Approaches Pack",
+    version: "1.0",
+    description: "Roads, ravines, old stones, cult scouts, omens, and escalating elemental pressure near the Temple.",
+    tables: {
+      "Temple Approaches": [
+        {
+          roll: "1-2",
+          type: "Hostile",
+          name: "Earth Cult Road Watch",
+          monsters: [{ name: "Cultist Acolyte", quantity: 3 }],
+          description: "Mud-streaked figures rise from behind old stones. One touches a charm at his throat and whispers into the ground.",
+          dmNotes: "One cultist attempts to flee and warn others if bloodied.",
+        },
+        {
+          roll: "3",
+          type: "Non-Hostile",
+          name: "Breathing Earth",
+          monsters: [],
+          description: "The roadbed rises and falls once, like a sleeping beast taking a slow breath beneath the stones.",
+          dmNotes: "No combat. Increase tension, advance corruption, or foreshadow a sinkhole hazard.",
+        },
+        {
+          roll: "4",
+          type: "Non-Hostile",
+          name: "Broken Pilgrim Marker",
+          monsters: [],
+          description: "A roadside marker has been split down the middle. Someone smeared old blood into the crack in the shape of an elemental sign.",
+          dmNotes: "DC 13 Religion identifies a corrupted protective marker.",
+        },
+        {
+          roll: "5-6",
+          type: "Hostile",
+          name: "Hidden Ravine Ambush",
+          monsters: [{ name: "Bandit", quantity: 4 }],
+          description: "Loose stones skitter from the ravine wall. A voice calls for surrender just as blades show among the rocks.",
+          dmNotes: "These may be cult-paid brigands rather than true believers.",
+        },
+      ],
+    },
+  },
+  {
+    name: "Burial Crypt Pack",
+    version: "1.0",
+    description: "Undead, funerary wards, desecrated niches, corpse-feeding ghouls, and tunnel horror below the Moathouse.",
+    tables: {
+      "Moathouse / Burial Crypt": [
+        {
+          roll: "1-2",
+          type: "Hostile",
+          name: "Ghoul Feeding Pack",
+          monsters: [{ name: "Ghoul", quantity: 4 }],
+          description: "Pale shapes squat over split bones, froth gathering around their mouths. When the party's light touches them, they stop chewing.",
+          dmNotes: "Open with paralysis pressure. Ghouls try to drag victims into side crypts.",
+        },
+        {
+          roll: "3",
+          type: "Non-Hostile",
+          name: "Cracked Funerary Ward",
+          monsters: [],
+          description: "A carved ward-stone lies broken in two. The older symbols beneath it are Flan; the newer scratches are crude elemental marks.",
+          dmNotes: "DC 13 Religion or History reveals someone intentionally overwrote old protections.",
+        },
+        {
+          roll: "4",
+          type: "Non-Hostile",
+          name: "Names in the Dust",
+          monsters: [],
+          description: "A list of names has been scratched into the dust with one trembling finger. One name is fresh.",
+          dmNotes: "Use to reveal a missing villager, cult prisoner, or future victim.",
+        },
+        {
+          roll: "5-6",
+          type: "Hostile",
+          name: "Corpse-Niche Ambush",
+          monsters: [{ name: "Ghoul", quantity: 2 }, { name: "Skeleton", quantity: 2 }],
+          description: "A burial niche collapses outward. Bones spill across the floor, and something hungry crawls behind them.",
+          dmNotes: "Skeletons occupy space while ghouls try to paralyze exposed targets.",
+        },
+      ],
+    },
+  },
+];
+
 const DEFAULT_WANDERING_TABLES = {
   "Moathouse / Burial Crypt": [
     {
@@ -788,6 +930,7 @@ export default function App() {
     threat: "Medium",
     tone: "Mixed",
   }));
+  const [sharedPackSearch, setSharedPackSearch] = useState(() => loadSaved("sharedPackSearch", ""));
   const [savedEncounters, setSavedEncounters] = useState(() =>
     loadSaved("savedEncounters", DEFAULT_ENCOUNTERS)
   );
@@ -827,6 +970,7 @@ export default function App() {
   useEffect(() => localStorage.setItem("wanderingGenerator", JSON.stringify(wanderingGenerator)), [wanderingGenerator]);
   useEffect(() => localStorage.setItem("encounterPackStatus", JSON.stringify(encounterPackStatus)), [encounterPackStatus]);
   useEffect(() => localStorage.setItem("packGenerator", JSON.stringify(packGenerator)), [packGenerator]);
+  useEffect(() => localStorage.setItem("sharedPackSearch", JSON.stringify(sharedPackSearch)), [sharedPackSearch]);
   useEffect(() => localStorage.setItem("savedEncounters", JSON.stringify(savedEncounters)), [savedEncounters]);
 
   const addLog = (msg) =>
@@ -1553,6 +1697,59 @@ export default function App() {
     addLog("📤 Encounter pack exported.");
   };
 
+  const mergeEncounterPackTables = (importedTables) => {
+    let locationCount = 0;
+    let entryCount = 0;
+
+    setWanderingTables((prev) => {
+      const merged = { ...prev };
+
+      Object.entries(importedTables || {}).forEach(([location, entries]) => {
+        if (!Array.isArray(entries)) return;
+
+        locationCount += 1;
+        const current = merged[location] || [];
+        const updated = [...current];
+
+        entries.forEach((entry) => {
+          const cleanEntry = {
+            roll: entry.roll || "1",
+            type: entry.type || "Hostile",
+            name: entry.name || "Unnamed Encounter",
+            monsters: Array.isArray(entry.monsters) ? entry.monsters : [],
+            description: entry.description || "No description provided.",
+            dmNotes: entry.dmNotes || "No DM notes provided.",
+          };
+
+          const existingIndex = updated.findIndex(
+            (item) => item.name.toLowerCase() === cleanEntry.name.toLowerCase()
+          );
+
+          if (existingIndex >= 0) {
+            updated[existingIndex] = cleanEntry;
+          } else {
+            updated.push(cleanEntry);
+          }
+
+          entryCount += 1;
+        });
+
+        merged[location] = updated;
+      });
+
+      return merged;
+    });
+
+    return { locationCount, entryCount };
+  };
+
+  const installSharedEncounterPack = (pack) => {
+    const result = mergeEncounterPackTables(pack.tables || {});
+    const status = `Installed ${pack.name}: ${result.entryCount} encounter(s) across ${result.locationCount} location(s).`;
+    setEncounterPackStatus(status);
+    addLog(`📦 ${status}`);
+  };
+
   const importEncounterPack = (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -1570,49 +1767,8 @@ export default function App() {
           return;
         }
 
-        let locationCount = 0;
-        let entryCount = 0;
-
-        setWanderingTables((prev) => {
-          const merged = { ...prev };
-
-          Object.entries(importedTables).forEach(([location, entries]) => {
-            if (!Array.isArray(entries)) return;
-
-            locationCount += 1;
-            const current = merged[location] || [];
-            const updated = [...current];
-
-            entries.forEach((entry) => {
-              const cleanEntry = {
-                roll: entry.roll || "1",
-                type: entry.type || "Hostile",
-                name: entry.name || "Unnamed Encounter",
-                monsters: Array.isArray(entry.monsters) ? entry.monsters : [],
-                description: entry.description || "No description provided.",
-                dmNotes: entry.dmNotes || "No DM notes provided.",
-              };
-
-              const existingIndex = updated.findIndex(
-                (item) => item.name.toLowerCase() === cleanEntry.name.toLowerCase()
-              );
-
-              if (existingIndex >= 0) {
-                updated[existingIndex] = cleanEntry;
-              } else {
-                updated.push(cleanEntry);
-              }
-
-              entryCount += 1;
-            });
-
-            merged[location] = updated;
-          });
-
-          return merged;
-        });
-
-        const status = `Imported ${entryCount} encounter(s) across ${locationCount} location(s).`;
+        const result = mergeEncounterPackTables(importedTables);
+        const status = `Imported ${result.entryCount} encounter(s) across ${result.locationCount} location(s).`;
         setEncounterPackStatus(status);
         addLog(`📥 ${status}`);
         event.target.value = "";
@@ -2522,6 +2678,9 @@ Earth Node Progress: ${nodeProgress}%`;
               exportEncounterPack={exportEncounterPack}
               importEncounterPack={importEncounterPack}
               encounterPackStatus={encounterPackStatus}
+              sharedPackSearch={sharedPackSearch}
+              setSharedPackSearch={setSharedPackSearch}
+              installSharedEncounterPack={installSharedEncounterPack}
               packGenerator={packGenerator}
               setPackGenerator={setPackGenerator}
               generateEncounterPack={generateEncounterPack}
@@ -2937,6 +3096,9 @@ function WanderingEncounterPanel({
   exportEncounterPack,
   importEncounterPack,
   encounterPackStatus,
+  sharedPackSearch,
+  setSharedPackSearch,
+  installSharedEncounterPack,
   packGenerator,
   setPackGenerator,
   generateEncounterPack,
@@ -2946,6 +3108,34 @@ function WanderingEncounterPanel({
 
   return (
     <Panel title="Wandering Encounters">
+      <div style={wanderingGeneratorStyle}>
+        <h3 style={subHeaderStyle}>Shared Encounter Packs</h3>
+        <input
+          style={inputStyle}
+          placeholder="Search shared packs"
+          value={sharedPackSearch}
+          onChange={(event) => setSharedPackSearch(event.target.value)}
+        />
+        <div style={sharedPackListStyle}>
+          {SHARED_ENCOUNTER_PACKS
+            .filter((pack) =>
+              !sharedPackSearch.trim() ||
+              pack.name.toLowerCase().includes(sharedPackSearch.toLowerCase()) ||
+              pack.description.toLowerCase().includes(sharedPackSearch.toLowerCase())
+            )
+            .map((pack) => (
+              <div key={pack.name} style={innerCardStyle}>
+                <strong>{pack.name}</strong>
+                <div style={{ fontSize: 12, color: "#cbd5e1" }}>v{pack.version}</div>
+                <p style={{ marginTop: 6 }}>{pack.description}</p>
+                <button style={smallButtonStyle} onClick={() => installSharedEncounterPack(pack)}>
+                  📦 Install Pack
+                </button>
+              </div>
+            ))}
+        </div>
+      </div>
+
       <div style={wanderingGeneratorStyle}>
         <h3 style={subHeaderStyle}>Open Encounter Pack Generator</h3>
         <input
@@ -3561,6 +3751,7 @@ const monsterImportResultsStyle = { marginTop: 8, maxHeight: 220, overflowY: "au
 const wanderingEditorStyle = { marginTop: 12, paddingTop: 12, borderTop: "1px solid #374151" };
 const wanderingGeneratorStyle = { marginBottom: 12, paddingBottom: 12, borderBottom: "1px solid #374151" };
 const wanderingTableListStyle = { marginTop: 12, maxHeight: 260, overflowY: "auto" };
+const sharedPackListStyle = { marginTop: 8, maxHeight: 260, overflowY: "auto" };
 const logBoxStyle = { maxHeight: 135, overflowY: "auto", fontSize: 13 };
 const linkButtonStyle = { display: "inline-block", textDecoration: "none", color: "#fff", background: "linear-gradient(180deg, #4b5563 0%, #252b34 100%)", border: "1px solid #6b7280", borderRadius: 6, padding: "10px 14px", fontWeight: "bold" };
 const miniGridStyle = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 6 };
