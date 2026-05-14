@@ -836,6 +836,11 @@ export default function App() {
   const [earthCult, setEarthCult] = useState(() => loadSaved("earthCult", 3));
   const [dungeonAlert, setDungeonAlert] = useState(() => loadSaved("dungeonAlert", 3));
   const [nodeProgress, setNodeProgress] = useState(() => loadSaved("nodeProgress", 35));
+  const [worldPressure, setWorldPressure] = useState(() => loadSaved("worldPressure", {
+    earthCorruption: 45,
+    moathouseStability: 2,
+    wildernessDanger: 3,
+  }));
 
   const [party, setParty] = useState(() =>
     loadSaved("party", [
@@ -947,6 +952,7 @@ export default function App() {
   useEffect(() => localStorage.setItem("earthCult", JSON.stringify(earthCult)), [earthCult]);
   useEffect(() => localStorage.setItem("dungeonAlert", JSON.stringify(dungeonAlert)), [dungeonAlert]);
   useEffect(() => localStorage.setItem("nodeProgress", JSON.stringify(nodeProgress)), [nodeProgress]);
+  useEffect(() => localStorage.setItem("worldPressure", JSON.stringify(worldPressure)), [worldPressure]);
   useEffect(() => localStorage.setItem("party", JSON.stringify(party)), [party]);
   useEffect(() => localStorage.setItem("enemies", JSON.stringify(enemies)), [enemies]);
   useEffect(() => localStorage.setItem("defeatedEnemies", JSON.stringify(defeatedEnemies)), [defeatedEnemies]);
@@ -999,6 +1005,7 @@ export default function App() {
     earthCult,
     dungeonAlert,
     nodeProgress,
+    worldPressure,
     calendar,
     log,
   });
@@ -1008,7 +1015,7 @@ export default function App() {
       localStorage.setItem("greyhawkCampaignAutosave", JSON.stringify(getCampaignState()));
     }, 60000);
     return () => clearInterval(interval);
-  }, [party, enemies, defeatedEnemies, monsterLibrary, turnIndex, round, activeEncounterName, encounterSummary, npcs, encounterName, savedEncounters, earthCult, dungeonAlert, nodeProgress, calendar, log]);
+  }, [party, enemies, defeatedEnemies, monsterLibrary, turnIndex, round, activeEncounterName, encounterSummary, npcs, encounterName, savedEncounters, earthCult, dungeonAlert, nodeProgress, worldPressure, calendar, log]);
 
   const postToDiscord = async (target, message) => {
     if (!bridgeUrl || !apiKey) {
@@ -1618,58 +1625,64 @@ export default function App() {
     const environment = packGenerator.environment || "Wilderness";
     const threat = packGenerator.threat || "Medium";
     const tone = packGenerator.tone || "Mixed";
+    const themeLower = theme.toLowerCase();
 
     const hostilePool = monsterLibrary.filter((monster) => {
       const name = monster.name.toLowerCase();
-      if (theme.toLowerCase().includes("forest")) {
+
+      if (themeLower.includes("forest")) {
         return name.includes("wolf") || name.includes("spider") || name.includes("goblin") || name.includes("cult") || name.includes("husk");
       }
-      if (theme.toLowerCase().includes("crypt") || theme.toLowerCase().includes("moathouse")) {
+
+      if (themeLower.includes("crypt") || themeLower.includes("moathouse")) {
         return name.includes("ghoul") || name.includes("skeleton") || name.includes("zombie") || name.includes("husk");
       }
+
       return true;
     });
 
-    const fallback = hostilePool.length ? hostilePool : monsterLibrary.slice(0, 8);
-
+    const fallbackPool = hostilePool.length ? hostilePool : monsterLibrary.slice(0, 8);
     const quantityOptions = threat === "Low" ? [1, 2] : threat === "High" ? [3, 4, 5] : [2, 3, 4];
+    const nonHostileNames = [
+      "Old Warning Marker",
+      "Abandoned Camp",
+      "Whispering Wind",
+      "Broken Shrine",
+      "Distant Movement",
+      "Strange Tracks",
+    ];
+
+    const pressureSuffix = (worldPressure.earthCorruption || 0) >= 60
+      ? " The corruption here is visibly worsening."
+      : (worldPressure.wildernessDanger || 0) >= 4
+        ? " The area is tense and dangerous."
+        : "";
 
     const generatedEntries = [];
 
-    for (let i = 0; i < 6; i += 1) {
-      const hostile = tone === "Hostile"
-        ? true
-        : tone === "Non-Hostile"
-          ? false
-          : Math.random() < 0.6;
+    for (let index = 0; index < 6; index += 1) {
+      const hostile = tone === "Hostile" ? true : tone === "Non-Hostile" ? false : Math.random() < 0.6;
 
       if (hostile) {
-        const monster = chooseRandom(fallback);
+        const monster = chooseRandom(fallbackPool) || { name: "Unknown Foe" };
         const quantity = chooseRandom(quantityOptions);
 
         generatedEntries.push({
-          roll: `${i + 1}`,
+          roll: String(index + 1),
           type: "Hostile",
-          name: `${monster.name} Patrol`,
+          name: monster.name + " Patrol",
           monsters: [{ name: monster.name, quantity }],
-          description: `The ${environment.toLowerCase()} grows tense and watchful. ${quantity} ${monster.name}${quantity > 1 ? "s" : ""} emerge from concealment, reacting to the party's presence with immediate hostility.`,
-          dmNotes: `Threat: ${threat}. Use terrain and visibility from ${environment}. Allow scouting or stealth if the party is cautious.`,
+          description: "The " + environment.toLowerCase() + " grows tense and watchful. " + quantity + " " + monster.name + (quantity > 1 ? "s" : "") + " emerge from concealment, reacting to the party's presence with immediate hostility." + pressureSuffix,
+          dmNotes: "Threat: " + threat + ". Use terrain and visibility from " + environment + ". Allow scouting or stealth if the party is cautious.",
         });
       } else {
         generatedEntries.push({
-          roll: `${i + 1}`,
+          roll: String(index + 1),
           type: "Non-Hostile",
-          name: chooseRandom([
-            "Old Warning Marker",
-            "Abandoned Camp",
-            "Whispering Wind",
-            "Broken Shrine",
-            "Distant Movement",
-            "Strange Tracks",
-          ]),
+          name: chooseRandom(nonHostileNames),
           monsters: [],
-          description: `The ${environment.toLowerCase()} reveals signs of deeper danger rather than immediate attack. Something here suggests movement, corruption, fear, or forgotten history.`,
-          dmNotes: `Use this encounter to reinforce atmosphere, foreshadow future threats, or reveal clues tied to ${theme}.`,
+          description: "The " + environment.toLowerCase() + " reveals signs of deeper danger rather than immediate attack. Something here suggests movement, corruption, fear, or forgotten history." + pressureSuffix,
+          dmNotes: "Use this encounter to reinforce atmosphere, foreshadow future threats, or reveal clues tied to " + theme + ". Current pressure: Earth Corruption " + (worldPressure.earthCorruption || 0) + "%, Wild Danger " + (worldPressure.wildernessDanger || 0) + "/5.",
         });
       }
     }
@@ -1680,8 +1693,8 @@ export default function App() {
     }));
 
     setWanderingLocation(theme);
-    setEncounterPackStatus(`Generated encounter pack: ${theme}`);
-    addLog(`✨ Generated encounter pack for ${theme}.`);
+    setEncounterPackStatus("Generated encounter pack: " + theme);
+    addLog("✨ Generated encounter pack for " + theme + ".");
   };
 
   const exportEncounterPack = () => {
@@ -1850,6 +1863,7 @@ export default function App() {
     const hostile = forceHostile ? true : forceNonHostile ? false : Math.random() < 0.55;
 
     const lower = (location + " " + environment).toLowerCase();
+
     let monsterChoices = ["Wolf", "Bandit", "Goblin", "Giant Rat"];
     let nonHostileNames = ["Lost Traveler", "Old Warning Sign", "Distant Campfire", "Uneasy Animal Omen"];
     let atmosphere = "The road grows quiet, and every sound seems to travel farther than it should.";
@@ -1866,33 +1880,44 @@ export default function App() {
       monsterChoices = ["Ghoul", "Skeleton", "Zombie", "Rootbound Husk"];
       nonHostileNames = ["Whispering Burial Niche", "Broken Funerary Ward", "Cold Handprint", "Name Scratched in Stone"];
       atmosphere = "The air turns dry and old. Dust lies thick over the stone, except where something has dragged itself through it.";
-    } else if (lower.includes("road") || lower.includes("hommlet")) {
-      monsterChoices = ["Bandit", "Wolf", "Cultist Acolyte", "Goblin"];
-      nonHostileNames = ["Nervous Merchant", "Broken Cart", "Roadside Shrine", "Farmer with Bad News"];
-      atmosphere = "The road bends through quiet country, but the silence has the watchful quality of a held breath.";
     }
 
-    const quantityByThreat = threat === "Low" ? [1, 2] : threat === "High" ? [3, 4, 5] : [2, 3, 4];
+    const quantityByThreat = threat === "Low"
+      ? [1, 2]
+      : threat === "High"
+        ? [3, 4, 5]
+        : [2, 3, 4];
+
     const quantity = chooseRandom(quantityByThreat);
     const monsterName = chooseRandom(monsterChoices);
 
-    const generated = hostile
-      ? {
-          roll: "Generated",
-          type: "Hostile",
-          name: `${monsterName} Disturbance`,
-          monsters: [{ name: monsterName, quantity }],
-          description: `${atmosphere} Then movement breaks the stillness: ${quantity} shape${quantity > 1 ? "s" : ""} emerge from cover, drawn by hunger, fear, or darker command.`,
-          dmNotes: `Threat: ${threat}. Use terrain from ${environment}. If the party is cautious, allow Perception/Survival checks before initiative. If they are loud or exposed, begin with the monsters in advantageous positions.`,
-        }
-      : {
-          roll: "Generated",
-          type: "Non-Hostile",
-          name: chooseRandom(nonHostileNames),
-          monsters: [],
-          description: `${atmosphere} The party encounters a sign of the region's deeper trouble rather than an immediate attack. Something here hints at danger, memory, or a path not yet taken.`,
-          dmNotes: `Use this as atmosphere, clue, omen, or roleplay beat. Tie it to ${location}, the party's current objective, or the nearest faction threat.`,
-        };
+    const pressureSuffix = (worldPressure.earthCorruption || 0) >= 60
+      ? " The corruption here is visibly worsening."
+      : (worldPressure.wildernessDanger || 0) >= 4
+        ? " The area feels tense and dangerous."
+        : "";
+
+    let generated;
+
+    if (hostile) {
+      generated = {
+        roll: "Generated",
+        type: "Hostile",
+        name: `${monsterName} Disturbance`,
+        monsters: [{ name: monsterName, quantity }],
+        description: `The ${environment.toLowerCase()} grows tense and watchful. ${quantity} ${monsterName}${quantity > 1 ? "s" : ""} emerge from concealment, reacting to the party's presence with immediate hostility.${pressureSuffix}`,
+        dmNotes: `Threat: ${threat}. Use terrain and visibility from ${environment}.`,
+      };
+    } else {
+      generated = {
+        roll: "Generated",
+        type: "Non-Hostile",
+        name: chooseRandom(nonHostileNames),
+        monsters: [],
+        description: `The ${environment.toLowerCase()} reveals signs of deeper danger rather than immediate attack.${pressureSuffix}`,
+        dmNotes: `Use this encounter to reinforce atmosphere or foreshadow future threats tied to ${location}.`,
+      };
+    }
 
     const payload = {
       ...generated,
@@ -1921,11 +1946,18 @@ export default function App() {
       return Number(entry.roll) === die;
     }) || table[0];
 
+    const pressureNote = (worldPressure.earthCorruption || 0) >= 60
+      ? "High corruption: add root growth, corpse movement, foul earth, or an escalating hazard."
+      : (worldPressure.wildernessDanger || 0) >= 4
+        ? "High danger: enemies are more alert, tracks are fresher, and escape routes are worse."
+        : "World pressure is stable but watchful.";
+
     const payload = {
       ...result,
       die,
       location: wanderingLocation,
       rolledAt: new Date().toLocaleTimeString(),
+      pressureNote,
     };
 
     setWanderingResult(payload);
@@ -2298,6 +2330,7 @@ Earth Node Progress: ${nodeProgress}%`;
         earthCult,
         dungeonAlert,
         nodeProgress,
+        worldPressure,
         calendar: nextCalendar,
         log,
       };
@@ -2383,6 +2416,7 @@ Earth Node Progress: ${nodeProgress}%`;
       setEarthCult(data.earthCult ?? 3);
       setDungeonAlert(data.dungeonAlert ?? 3);
       setNodeProgress(data.nodeProgress ?? 35);
+      setWorldPressure(data.worldPressure || { earthCorruption: 45, moathouseStability: 2, wildernessDanger: 3 });
       setCalendar(data.calendar || calendar);
       setLog(data.log || []);
       addLog("📂 Campaign loaded.");
@@ -2463,6 +2497,7 @@ Earth Node Progress: ${nodeProgress}%`;
       setEarthCult(data.earthCult ?? 3);
       setDungeonAlert(data.dungeonAlert ?? 3);
       setNodeProgress(data.nodeProgress ?? 35);
+      setWorldPressure(data.worldPressure || { earthCorruption: 45, moathouseStability: 2, wildernessDanger: 3 });
       setCalendar(data.calendar || calendar);
       setLog(data.log || []);
 
@@ -2509,7 +2544,8 @@ Earth Node Progress: ${nodeProgress}%`;
         setEarthCult(data.earthCult ?? 3);
         setDungeonAlert(data.dungeonAlert ?? 3);
         setNodeProgress(data.nodeProgress ?? 35);
-        setCalendar(data.calendar || calendar);
+      setWorldPressure(data.worldPressure || { earthCorruption: 45, moathouseStability: 2, wildernessDanger: 3 });
+      setCalendar(data.calendar || calendar);
         setLog(data.log || []);
         addLog("📥 Campaign imported.");
       } catch {
@@ -2583,13 +2619,21 @@ Earth Node Progress: ${nodeProgress}%`;
             <input style={inputStyle} type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
           </Panel>
           <WorldClockPanel calendar={calendar} advanceTime={advanceTime} />
-          <Panel title="Faction / Node">
+          <Panel title="World Pressure">
             <div>Earth Cult: {earthCult}/5</div>
-            <div>Dungeon: {dungeonAlert}/5</div>
+            <div>Dungeon Alert: {dungeonAlert}/5</div>
             <div>Earth Node: {nodeProgress}%</div>
-            <button style={smallButtonStyle} onClick={() => setEarthCult((v) => clamp(v + 1, 0, 5))}>Cult +</button>
-            <button style={smallButtonStyle} onClick={() => setDungeonAlert((v) => clamp(v + 1, 0, 5))}>Dungeon +</button>
-            <button style={smallButtonStyle} onClick={() => setNodeProgress((v) => clamp(v + 10, 0, 100))}>Node +</button>
+            <div>Earth Corruption: {worldPressure.earthCorruption}%</div>
+            <div>Moathouse Stability: {worldPressure.moathouseStability}/5</div>
+            <div>Wild Danger: {worldPressure.wildernessDanger}/5</div>
+            <div style={buttonWrapStyle}>
+              <button style={smallButtonStyle} onClick={() => setEarthCult((v) => clamp(v + 1, 0, 5))}>Cult +</button>
+              <button style={smallButtonStyle} onClick={() => setDungeonAlert((v) => clamp(v + 1, 0, 5))}>Dungeon +</button>
+              <button style={smallButtonStyle} onClick={() => setNodeProgress((v) => clamp(v + 10, 0, 100))}>Node +</button>
+              <button style={smallButtonStyle} onClick={() => setWorldPressure((v) => ({ ...v, earthCorruption: clamp((v.earthCorruption || 0) + 5, 0, 100) }))}>Corrupt +</button>
+              <button style={smallButtonStyle} onClick={() => setWorldPressure((v) => ({ ...v, moathouseStability: clamp((v.moathouseStability || 0) - 1, 0, 5) }))}>Stability -</button>
+              <button style={smallButtonStyle} onClick={() => setWorldPressure((v) => ({ ...v, wildernessDanger: clamp((v.wildernessDanger || 0) + 1, 0, 5) }))}>Danger +</button>
+            </div>
           </Panel>
           <Panel title="Fantasy Calendar">
             <div style={{ marginBottom: 10 }}>Greyhawk Campaign Calendar</div>
@@ -2666,6 +2710,8 @@ Earth Node Progress: ${nodeProgress}%`;
               wanderingResult={wanderingResult}
               rollWanderingEncounter={rollWanderingEncounter}
               addWanderingMonstersToEncounter={addWanderingMonstersToEncounter}
+              worldPressure={worldPressure}
+              setWorldPressure={setWorldPressure}
               wanderingEditor={wanderingEditor}
               setWanderingEditor={setWanderingEditor}
               wanderingGenerator={wanderingGenerator}
@@ -3084,6 +3130,8 @@ function WanderingEncounterPanel({
   wanderingResult,
   rollWanderingEncounter,
   addWanderingMonstersToEncounter,
+  worldPressure,
+  setWorldPressure,
   wanderingEditor,
   setWanderingEditor,
   wanderingGenerator,
@@ -3103,11 +3151,23 @@ function WanderingEncounterPanel({
   setPackGenerator,
   generateEncounterPack,
 }) {
-  const locations = Object.keys(wanderingTables);
-  const currentTable = wanderingTables[wanderingLocation] || [];
+  const locations = Object.keys(wanderingTables || {});
+  const currentTable = (wanderingTables && wanderingTables[wanderingLocation]) || [];
 
   return (
     <Panel title="Wandering Encounters">
+      <div style={worldPressureMiniStyle}>
+        <strong>Dynamic World State</strong>
+        <div>Earth Corruption: {worldPressure?.earthCorruption || 0}%</div>
+        <div>Moathouse Stability: {worldPressure?.moathouseStability || 0}/5</div>
+        <div>Wild Danger: {worldPressure?.wildernessDanger || 0}/5</div>
+        <div style={buttonWrapStyle}>
+          <button style={smallButtonStyle} onClick={() => setWorldPressure((v) => ({ ...v, earthCorruption: clamp((v.earthCorruption || 0) + 5, 0, 100) }))}>Corruption +</button>
+          <button style={smallButtonStyle} onClick={() => setWorldPressure((v) => ({ ...v, wildernessDanger: clamp((v.wildernessDanger || 0) + 1, 0, 5) }))}>Danger +</button>
+          <button style={smallButtonStyle} onClick={() => setWorldPressure((v) => ({ ...v, moathouseStability: clamp((v.moathouseStability || 0) - 1, 0, 5) }))}>Stability -</button>
+        </div>
+      </div>
+
       <div style={wanderingGeneratorStyle}>
         <h3 style={subHeaderStyle}>Shared Encounter Packs</h3>
         <input
@@ -3117,22 +3177,18 @@ function WanderingEncounterPanel({
           onChange={(event) => setSharedPackSearch(event.target.value)}
         />
         <div style={sharedPackListStyle}>
-          {SHARED_ENCOUNTER_PACKS
-            .filter((pack) =>
-              !sharedPackSearch.trim() ||
-              pack.name.toLowerCase().includes(sharedPackSearch.toLowerCase()) ||
-              pack.description.toLowerCase().includes(sharedPackSearch.toLowerCase())
-            )
-            .map((pack) => (
-              <div key={pack.name} style={innerCardStyle}>
-                <strong>{pack.name}</strong>
-                <div style={{ fontSize: 12, color: "#cbd5e1" }}>v{pack.version}</div>
-                <p style={{ marginTop: 6 }}>{pack.description}</p>
-                <button style={smallButtonStyle} onClick={() => installSharedEncounterPack(pack)}>
-                  📦 Install Pack
-                </button>
-              </div>
-            ))}
+          {SHARED_ENCOUNTER_PACKS.filter((pack) => {
+            const query = (sharedPackSearch || "").trim().toLowerCase();
+            if (!query) return true;
+            return pack.name.toLowerCase().includes(query) || pack.description.toLowerCase().includes(query);
+          }).map((pack) => (
+            <div key={pack.name} style={innerCardStyle}>
+              <strong>{pack.name}</strong>
+              <div style={{ fontSize: 12, color: "#cbd5e1" }}>v{pack.version}</div>
+              <p style={{ marginTop: 6 }}>{pack.description}</p>
+              <button style={smallButtonStyle} onClick={() => installSharedEncounterPack(pack)}>📦 Install Pack</button>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -3226,14 +3282,37 @@ function WanderingEncounterPanel({
         <button style={smallButtonStyle} onClick={exportEncounterPack}>📤 Export Pack</button>
         <label style={smallButtonStyle}>
           📥 Import Pack
-          <input
-            type="file"
-            accept=".json"
-            onChange={importEncounterPack}
-            style={{ display: "none" }}
-          />
+          <input type="file" accept=".json" onChange={importEncounterPack} style={{ display: "none" }} />
         </label>
       </div>
+      <div style={{ fontSize: 12, color: "#cbd5e1", marginTop: 6 }}>Pack: {encounterPackStatus}</div>
+
+      {wanderingResult && (
+        <div style={innerCardStyle}>
+          <div style={{ fontSize: 13, color: "#f2d28b" }}>
+            {wanderingResult.location} — d6: {wanderingResult.die} — {wanderingResult.type}
+          </div>
+          <h3 style={subHeaderStyle}>{wanderingResult.name}</h3>
+          <p><strong>Read-Aloud / DM Description:</strong></p>
+          <p>{wanderingResult.description}</p>
+          <p><strong>DM Notes:</strong> {wanderingResult.dmNotes}</p>
+          {wanderingResult.pressureNote && <p><strong>World Pressure:</strong> {wanderingResult.pressureNote}</p>}
+
+          {wanderingResult.monsters?.length > 0 ? (
+            <div>
+              <strong>Monsters:</strong>
+              <ul>
+                {wanderingResult.monsters.map((monster, index) => (
+                  <li key={index}>{monster.quantity}x {monster.name}</li>
+                ))}
+              </ul>
+              <button style={buttonStyle} onClick={addWanderingMonstersToEncounter}>⚔️ Add to Encounter</button>
+            </div>
+          ) : (
+            <div style={{ color: "#cbd5e1" }}>No hostile monsters. Use as clue, hazard, atmosphere, or roleplay beat.</div>
+          )}
+        </div>
+      )}
 
       <div style={wanderingEditorStyle}>
         <h3 style={subHeaderStyle}>Table Editor</h3>
@@ -3267,7 +3346,7 @@ function WanderingEncounterPanel({
         />
         <textarea
           style={textAreaStyle}
-          placeholder={'Monsters, one per line, e.g. 4x Ghoul'}
+          placeholder="Monsters, one per line, e.g. 4x Ghoul"
           value={wanderingEditor.monstersText}
           onChange={(event) => setWanderingEditor({ ...wanderingEditor, monstersText: event.target.value })}
         />
@@ -3301,35 +3380,6 @@ function WanderingEncounterPanel({
           ))
         )}
       </div>
-      <div style={{ fontSize: 12, color: "#cbd5e1", marginTop: 6 }}>Pack: {encounterPackStatus}</div>
-
-      {wanderingResult && (
-        <div style={innerCardStyle}>
-          <div style={{ fontSize: 13, color: "#f2d28b" }}>
-            {wanderingResult.location} — d6: {wanderingResult.die} — {wanderingResult.type}
-          </div>
-          <h3 style={subHeaderStyle}>{wanderingResult.name}</h3>
-          <p><strong>Read-Aloud / DM Description:</strong></p>
-          <p>{wanderingResult.description}</p>
-          <p><strong>DM Notes:</strong> {wanderingResult.dmNotes}</p>
-
-          {wanderingResult.monsters?.length > 0 ? (
-            <div>
-              <strong>Monsters:</strong>
-              <ul>
-                {wanderingResult.monsters.map((monster, index) => (
-                  <li key={index}>{monster.quantity}x {monster.name}</li>
-                ))}
-              </ul>
-              <button style={buttonStyle} onClick={addWanderingMonstersToEncounter}>
-                ⚔️ Add to Encounter
-              </button>
-            </div>
-          ) : (
-            <div style={{ color: "#cbd5e1" }}>No hostile monsters. Use as clue, hazard, atmosphere, or roleplay beat.</div>
-          )}
-        </div>
-      )}
     </Panel>
   );
 }
@@ -3752,6 +3802,7 @@ const wanderingEditorStyle = { marginTop: 12, paddingTop: 12, borderTop: "1px so
 const wanderingGeneratorStyle = { marginBottom: 12, paddingBottom: 12, borderBottom: "1px solid #374151" };
 const wanderingTableListStyle = { marginTop: 12, maxHeight: 260, overflowY: "auto" };
 const sharedPackListStyle = { marginTop: 8, maxHeight: 260, overflowY: "auto" };
+const worldPressureMiniStyle = { marginBottom: 12, padding: 10, background: "#141b26", border: "1px solid #8a6d1d", borderRadius: 6 };
 const logBoxStyle = { maxHeight: 135, overflowY: "auto", fontSize: 13 };
 const linkButtonStyle = { display: "inline-block", textDecoration: "none", color: "#fff", background: "linear-gradient(180deg, #4b5563 0%, #252b34 100%)", border: "1px solid #6b7280", borderRadius: 6, padding: "10px 14px", fontWeight: "bold" };
 const miniGridStyle = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 6 };
