@@ -775,6 +775,12 @@ export default function App() {
     description: "",
     dmNotes: "",
   }));
+  const [wanderingGenerator, setWanderingGenerator] = useState(() => loadSaved("wanderingGenerator", {
+    location: "Gnarley Forest",
+    environment: "Ancient forest",
+    tone: "Mixed",
+    threat: "Medium",
+  }));
   const [savedEncounters, setSavedEncounters] = useState(() =>
     loadSaved("savedEncounters", DEFAULT_ENCOUNTERS)
   );
@@ -811,6 +817,7 @@ export default function App() {
   useEffect(() => localStorage.setItem("wanderingLocation", JSON.stringify(wanderingLocation)), [wanderingLocation]);
   useEffect(() => localStorage.setItem("wanderingResult", JSON.stringify(wanderingResult)), [wanderingResult]);
   useEffect(() => localStorage.setItem("wanderingEditor", JSON.stringify(wanderingEditor)), [wanderingEditor]);
+  useEffect(() => localStorage.setItem("wanderingGenerator", JSON.stringify(wanderingGenerator)), [wanderingGenerator]);
   useEffect(() => localStorage.setItem("savedEncounters", JSON.stringify(savedEncounters)), [savedEncounters]);
 
   const addLog = (msg) =>
@@ -1507,6 +1514,74 @@ export default function App() {
       [wanderingLocation]: (prev[wanderingLocation] || []).filter((entry) => entry.name !== entryName),
     }));
     addLog(`🗑️ Wandering encounter deleted: ${entryName}.`);
+  };
+
+  const chooseRandom = (items) => items[Math.floor(Math.random() * items.length)];
+
+  const generateWanderingEncounter = () => {
+    const location = wanderingGenerator.location.trim() || "Unknown wilds";
+    const environment = wanderingGenerator.environment || "Wilderness";
+    const toneSetting = wanderingGenerator.tone || "Mixed";
+    const threat = wanderingGenerator.threat || "Medium";
+
+    const forceHostile = toneSetting === "Hostile";
+    const forceNonHostile = toneSetting === "Non-Hostile";
+    const hostile = forceHostile ? true : forceNonHostile ? false : Math.random() < 0.55;
+
+    const lower = (location + " " + environment).toLowerCase();
+    let monsterChoices = ["Wolf", "Bandit", "Goblin", "Giant Rat"];
+    let nonHostileNames = ["Lost Traveler", "Old Warning Sign", "Distant Campfire", "Uneasy Animal Omen"];
+    let atmosphere = "The road grows quiet, and every sound seems to travel farther than it should.";
+
+    if (lower.includes("gnarley") || lower.includes("forest")) {
+      monsterChoices = ["Wolf", "Dire Wolf", "Giant Spider", "Goblin", "Cultist Acolyte", "Rootbound Husk"];
+      nonHostileNames = ["The Silent Stag", "Druidic Warning Stones", "A Hunter Who Saw Too Much", "Old Elven Trail-Marker"];
+      atmosphere = "The trees press close, their boughs interlacing overhead until the path feels less like a road and more like a throat.";
+    } else if (lower.includes("marsh") || lower.includes("swamp") || lower.includes("moathouse")) {
+      monsterChoices = ["Ghoul", "Rootbound Husk", "Cultist Acolyte", "Giant Rat", "Giant Frog"];
+      nonHostileNames = ["Shard Resonance", "Sinking Ground", "Whispering Reeds", "Half-Buried Cult Mark"];
+      atmosphere = "Black water trembles in the reeds. Something beneath the mud exhales slowly.";
+    } else if (lower.includes("crypt") || lower.includes("tomb") || lower.includes("burial")) {
+      monsterChoices = ["Ghoul", "Skeleton", "Zombie", "Rootbound Husk"];
+      nonHostileNames = ["Whispering Burial Niche", "Broken Funerary Ward", "Cold Handprint", "Name Scratched in Stone"];
+      atmosphere = "The air turns dry and old. Dust lies thick over the stone, except where something has dragged itself through it.";
+    } else if (lower.includes("road") || lower.includes("hommlet")) {
+      monsterChoices = ["Bandit", "Wolf", "Cultist Acolyte", "Goblin"];
+      nonHostileNames = ["Nervous Merchant", "Broken Cart", "Roadside Shrine", "Farmer with Bad News"];
+      atmosphere = "The road bends through quiet country, but the silence has the watchful quality of a held breath.";
+    }
+
+    const quantityByThreat = threat === "Low" ? [1, 2] : threat === "High" ? [3, 4, 5] : [2, 3, 4];
+    const quantity = chooseRandom(quantityByThreat);
+    const monsterName = chooseRandom(monsterChoices);
+
+    const generated = hostile
+      ? {
+          roll: "Generated",
+          type: "Hostile",
+          name: `${monsterName} Disturbance`,
+          monsters: [{ name: monsterName, quantity }],
+          description: `${atmosphere} Then movement breaks the stillness: ${quantity} shape${quantity > 1 ? "s" : ""} emerge from cover, drawn by hunger, fear, or darker command.`,
+          dmNotes: `Threat: ${threat}. Use terrain from ${environment}. If the party is cautious, allow Perception/Survival checks before initiative. If they are loud or exposed, begin with the monsters in advantageous positions.`,
+        }
+      : {
+          roll: "Generated",
+          type: "Non-Hostile",
+          name: chooseRandom(nonHostileNames),
+          monsters: [],
+          description: `${atmosphere} The party encounters a sign of the region's deeper trouble rather than an immediate attack. Something here hints at danger, memory, or a path not yet taken.`,
+          dmNotes: `Use this as atmosphere, clue, omen, or roleplay beat. Tie it to ${location}, the party's current objective, or the nearest faction threat.`,
+        };
+
+    const payload = {
+      ...generated,
+      die: "—",
+      location,
+      rolledAt: new Date().toLocaleTimeString(),
+    };
+
+    setWanderingResult(payload);
+    addLog(`✨ Generated wandering encounter: ${location} — ${payload.name}.`);
   };
 
   const rollWanderingEncounter = () => {
@@ -2272,6 +2347,9 @@ Earth Node Progress: ${nodeProgress}%`;
               addWanderingMonstersToEncounter={addWanderingMonstersToEncounter}
               wanderingEditor={wanderingEditor}
               setWanderingEditor={setWanderingEditor}
+              wanderingGenerator={wanderingGenerator}
+              setWanderingGenerator={setWanderingGenerator}
+              generateWanderingEncounter={generateWanderingEncounter}
               saveWanderingEntry={saveWanderingEntry}
               editWanderingEntry={editWanderingEntry}
               deleteWanderingEntry={deleteWanderingEntry}
@@ -2678,6 +2756,9 @@ function WanderingEncounterPanel({
   addWanderingMonstersToEncounter,
   wanderingEditor,
   setWanderingEditor,
+  wanderingGenerator,
+  setWanderingGenerator,
+  generateWanderingEncounter,
   saveWanderingEntry,
   editWanderingEntry,
   deleteWanderingEntry,
@@ -2688,6 +2769,43 @@ function WanderingEncounterPanel({
 
   return (
     <Panel title="Wandering Encounters">
+      <div style={wanderingGeneratorStyle}>
+        <h3 style={subHeaderStyle}>Encounter Generator v2</h3>
+        <input
+          style={inputStyle}
+          placeholder="Location, e.g. Gnarley Forest"
+          value={wanderingGenerator.location}
+          onChange={(event) => setWanderingGenerator({ ...wanderingGenerator, location: event.target.value })}
+        />
+        <div style={miniGridStyle}>
+          <input
+            style={inputStyle}
+            placeholder="Environment, e.g. ancient forest"
+            value={wanderingGenerator.environment}
+            onChange={(event) => setWanderingGenerator({ ...wanderingGenerator, environment: event.target.value })}
+          />
+          <select
+            style={inputStyle}
+            value={wanderingGenerator.tone}
+            onChange={(event) => setWanderingGenerator({ ...wanderingGenerator, tone: event.target.value })}
+          >
+            <option>Mixed</option>
+            <option>Hostile</option>
+            <option>Non-Hostile</option>
+          </select>
+        </div>
+        <select
+          style={inputStyle}
+          value={wanderingGenerator.threat}
+          onChange={(event) => setWanderingGenerator({ ...wanderingGenerator, threat: event.target.value })}
+        >
+          <option>Low</option>
+          <option>Medium</option>
+          <option>High</option>
+        </select>
+        <button style={buttonStyle} onClick={generateWanderingEncounter}>✨ Generate Encounter</button>
+      </div>
+
       <select
         style={inputStyle}
         value={wanderingLocation}
@@ -3216,6 +3334,7 @@ const monsterEditorPanelStyle = { marginTop: 14, paddingTop: 12, borderTop: "1px
 const monsterImporterStyle = { marginBottom: 14, paddingBottom: 12, borderBottom: "1px solid #374151" };
 const monsterImportResultsStyle = { marginTop: 8, maxHeight: 220, overflowY: "auto" };
 const wanderingEditorStyle = { marginTop: 12, paddingTop: 12, borderTop: "1px solid #374151" };
+const wanderingGeneratorStyle = { marginBottom: 12, paddingBottom: 12, borderBottom: "1px solid #374151" };
 const wanderingTableListStyle = { marginTop: 12, maxHeight: 260, overflowY: "auto" };
 const logBoxStyle = { maxHeight: 135, overflowY: "auto", fontSize: 13 };
 const linkButtonStyle = { display: "inline-block", textDecoration: "none", color: "#fff", background: "linear-gradient(180deg, #4b5563 0%, #252b34 100%)", border: "1px solid #6b7280", borderRadius: 6, padding: "10px 14px", fontWeight: "bold" };
