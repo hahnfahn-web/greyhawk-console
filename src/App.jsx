@@ -844,6 +844,20 @@ export default function App() {
     },
   ]));
   const [selectedSceneId, setSelectedSceneId] = useState(() => loadSaved("selectedSceneId", "moathouse-burial-crypt"));
+  const [moduleSceneSearch, setModuleSceneSearch] = useState(() => loadSaved("moduleSceneSearch", ""));
+  const [moduleSceneEditor, setModuleSceneEditor] = useState(() => loadSaved("moduleSceneEditor", {
+    id: "",
+    module: "T1-4",
+    name: "",
+    location: "",
+    tagsText: "",
+    readAloud: "",
+    notesText: "",
+    monstersText: "",
+    treasure: "",
+    exitsText: "",
+  }));
+  const [moduleScenePackStatus, setModuleScenePackStatus] = useState(() => loadSaved("moduleScenePackStatus", "No module scene pack imported yet"));
 
   const [calendar, setCalendar] = useState(() =>
     loadSaved("calendar", {
@@ -976,6 +990,9 @@ export default function App() {
   useEffect(() => localStorage.setItem("autoCloudSave", JSON.stringify(autoCloudSave)), [autoCloudSave]);
   useEffect(() => localStorage.setItem("moduleScenes", JSON.stringify(moduleScenes)), [moduleScenes]);
   useEffect(() => localStorage.setItem("selectedSceneId", JSON.stringify(selectedSceneId)), [selectedSceneId]);
+  useEffect(() => localStorage.setItem("moduleSceneSearch", JSON.stringify(moduleSceneSearch)), [moduleSceneSearch]);
+  useEffect(() => localStorage.setItem("moduleSceneEditor", JSON.stringify(moduleSceneEditor)), [moduleSceneEditor]);
+  useEffect(() => localStorage.setItem("moduleScenePackStatus", JSON.stringify(moduleScenePackStatus)), [moduleScenePackStatus]);
   useEffect(() => localStorage.setItem("calendar", JSON.stringify(calendar)), [calendar]);
   useEffect(() => localStorage.setItem("earthCult", JSON.stringify(earthCult)), [earthCult]);
   useEffect(() => localStorage.setItem("dungeonAlert", JSON.stringify(dungeonAlert)), [dungeonAlert]);
@@ -1290,6 +1307,167 @@ export default function App() {
   };
 
   const activeScene = moduleScenes.find((scene) => scene.id === selectedSceneId) || moduleScenes[0];
+
+  const parseModuleSceneMonsters = (text) => {
+    return (text || "")
+      .split(String.fromCharCode(10))
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const marker = line.toLowerCase().indexOf("x ");
+        if (marker > 0) {
+          return {
+            quantity: Number(line.slice(0, marker).trim()) || 1,
+            name: line.slice(marker + 2).trim(),
+          };
+        }
+        return { quantity: 1, name: line };
+      });
+  };
+
+  const sceneToEditor = (scene) => ({
+    id: scene.id || "",
+    module: scene.module || "T1-4",
+    name: scene.name || "",
+    location: scene.location || "",
+    tagsText: (scene.tags || []).join(", "),
+    readAloud: scene.readAloud || "",
+    notesText: (scene.notes || []).join(String.fromCharCode(10)),
+    monstersText: (scene.monsters || []).map((monster) => `${monster.quantity || 1}x ${monster.name}`).join(String.fromCharCode(10)),
+    treasure: scene.treasure || "",
+    exitsText: (scene.exits || []).join(String.fromCharCode(10)),
+  });
+
+  const newModuleScene = () => {
+    setModuleSceneEditor({
+      id: "",
+      module: "T1-4",
+      name: "",
+      location: "",
+      tagsText: "",
+      readAloud: "",
+      notesText: "",
+      monstersText: "",
+      treasure: "",
+      exitsText: "",
+    });
+    addLog("📚 New module scene started.");
+  };
+
+  const editModuleScene = (scene) => {
+    setModuleSceneEditor(sceneToEditor(scene));
+    setSelectedSceneId(scene.id);
+    addLog(`✏️ Editing module scene: ${scene.name}.`);
+  };
+
+  const saveModuleScene = () => {
+    const name = moduleSceneEditor.name.trim();
+    if (!name) {
+      addLog("❌ Module scene requires a name.");
+      return;
+    }
+
+    const id = moduleSceneEditor.id || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `scene-${Date.now()}`;
+    const scene = {
+      id,
+      module: moduleSceneEditor.module || "T1-4",
+      name,
+      location: moduleSceneEditor.location || "Unknown Location",
+      tags: (moduleSceneEditor.tagsText || "").split(",").map((tag) => tag.trim()).filter(Boolean),
+      readAloud: moduleSceneEditor.readAloud || "No read-aloud text yet.",
+      notes: (moduleSceneEditor.notesText || "").split(String.fromCharCode(10)).map((note) => note.trim()).filter(Boolean),
+      monsters: parseModuleSceneMonsters(moduleSceneEditor.monstersText),
+      treasure: moduleSceneEditor.treasure || "No treasure or clues recorded.",
+      exits: (moduleSceneEditor.exitsText || "").split(String.fromCharCode(10)).map((exit) => exit.trim()).filter(Boolean),
+    };
+
+    setModuleScenes((prev) => {
+      const existingIndex = prev.findIndex((entry) => entry.id === id);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = scene;
+        return updated;
+      }
+      return [...prev, scene];
+    });
+
+    setSelectedSceneId(id);
+    setModuleSceneEditor(sceneToEditor(scene));
+    addLog(`💾 Module scene saved: ${scene.name}.`);
+  };
+
+  const deleteModuleScene = (sceneId) => {
+    setModuleScenes((prev) => {
+      const updated = prev.filter((scene) => scene.id !== sceneId);
+      if (selectedSceneId === sceneId && updated.length) {
+        setSelectedSceneId(updated[0].id);
+      }
+      return updated;
+    });
+    addLog("🗑️ Module scene deleted.");
+  };
+
+  const exportModuleScenePack = () => {
+    downloadJSON({
+      name: "Greyhawk Module Scene Pack",
+      version: "1.0",
+      exportedAt: new Date().toISOString(),
+      scenes: moduleScenes,
+    }, "GreyhawkModuleScenePack.json");
+    setModuleScenePackStatus("Module scene pack exported.");
+    addLog("📤 Module scene pack exported.");
+  };
+
+  const importModuleScenePack = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (loadEvent) => {
+      try {
+        const imported = JSON.parse(loadEvent.target.result);
+        const scenes = Array.isArray(imported) ? imported : imported.scenes;
+        if (!Array.isArray(scenes)) {
+          setModuleScenePackStatus("Import failed: pack must contain scenes array.");
+          addLog("❌ Module scene pack import failed: invalid format.");
+          return;
+        }
+
+        let importedCount = 0;
+        setModuleScenes((prev) => {
+          const merged = [...prev];
+          scenes.forEach((scene) => {
+            if (!scene.name) return;
+            const clean = {
+              id: scene.id || scene.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
+              module: scene.module || "T1-4",
+              name: scene.name,
+              location: scene.location || "Unknown Location",
+              tags: Array.isArray(scene.tags) ? scene.tags : [],
+              readAloud: scene.readAloud || "No read-aloud text yet.",
+              notes: Array.isArray(scene.notes) ? scene.notes : [],
+              monsters: Array.isArray(scene.monsters) ? scene.monsters : [],
+              treasure: scene.treasure || "No treasure or clues recorded.",
+              exits: Array.isArray(scene.exits) ? scene.exits : [],
+            };
+            const existingIndex = merged.findIndex((entry) => entry.id === clean.id);
+            if (existingIndex >= 0) merged[existingIndex] = clean;
+            else merged.push(clean);
+            importedCount += 1;
+          });
+          return merged;
+        });
+
+        setModuleScenePackStatus(`Imported ${importedCount} module scene(s).`);
+        addLog(`📥 Imported ${importedCount} module scene(s).`);
+        event.target.value = "";
+      } catch (err) {
+        setModuleScenePackStatus(`Import failed: ${err.message}`);
+        addLog(`❌ Module scene pack import failed: ${err.message}`);
+      }
+    };
+    reader.readAsText(file);
+  };
 
   const addSceneMonstersToEncounter = (scene) => {
     if (!scene?.monsters?.length) {
@@ -2710,6 +2888,17 @@ Earth Node Progress: ${nodeProgress}%`;
               setSelectedSceneId={setSelectedSceneId}
               activeScene={activeScene}
               addSceneMonstersToEncounter={addSceneMonstersToEncounter}
+              moduleSceneSearch={moduleSceneSearch}
+              setModuleSceneSearch={setModuleSceneSearch}
+              moduleSceneEditor={moduleSceneEditor}
+              setModuleSceneEditor={setModuleSceneEditor}
+              newModuleScene={newModuleScene}
+              editModuleScene={editModuleScene}
+              saveModuleScene={saveModuleScene}
+              deleteModuleScene={deleteModuleScene}
+              exportModuleScenePack={exportModuleScenePack}
+              importModuleScenePack={importModuleScenePack}
+              moduleScenePackStatus={moduleScenePackStatus}
             />
           )}
         </div>
@@ -3260,15 +3449,51 @@ function ModuleReferencePanel({
   setSelectedSceneId,
   activeScene,
   addSceneMonstersToEncounter,
+  moduleSceneSearch,
+  setModuleSceneSearch,
+  moduleSceneEditor,
+  setModuleSceneEditor,
+  newModuleScene,
+  editModuleScene,
+  saveModuleScene,
+  deleteModuleScene,
+  exportModuleScenePack,
+  importModuleScenePack,
+  moduleScenePackStatus,
 }) {
+  const query = (moduleSceneSearch || "").trim().toLowerCase();
+  const filteredScenes = (moduleScenes || []).filter((scene) => {
+    if (!query) return true;
+    return [scene.name, scene.module, scene.location, ...(scene.tags || [])]
+      .join(" ")
+      .toLowerCase()
+      .includes(query);
+  });
   return (
     <Panel title="Module Reference">
+      <input
+        style={inputStyle}
+        placeholder="Search scenes by name, module, location, or tag"
+        value={moduleSceneSearch}
+        onChange={(event) => setModuleSceneSearch(event.target.value)}
+      />
+
+      <div style={buttonWrapStyle}>
+        <button style={smallButtonStyle} onClick={newModuleScene}>➕ New Scene</button>
+        <button style={smallButtonStyle} onClick={exportModuleScenePack}>📤 Export Scenes</button>
+        <label style={smallButtonStyle}>
+          📥 Import Scenes
+          <input type="file" accept=".json" onChange={importModuleScenePack} style={{ display: "none" }} />
+        </label>
+      </div>
+      <div style={{ fontSize: 12, color: "#cbd5e1", marginBottom: 8 }}>Scene Pack: {moduleScenePackStatus}</div>
+
       <select
         style={inputStyle}
         value={selectedSceneId}
         onChange={(event) => setSelectedSceneId(event.target.value)}
       >
-        {moduleScenes.map((scene) => (
+        {filteredScenes.map((scene) => (
           <option key={scene.id} value={scene.id}>
             {scene.module} — {scene.name}
           </option>
@@ -3327,6 +3552,29 @@ function ModuleReferencePanel({
           </div>
         </div>
       )}
+
+      {activeScene && (
+        <div style={buttonWrapStyle}>
+          <button style={buttonStyle} onClick={() => editModuleScene(activeScene)}>✏️ Edit Active Scene</button>
+          <button style={dangerButtonStyle} onClick={() => deleteModuleScene(activeScene.id)}>Delete Active Scene</button>
+        </div>
+      )}
+
+      <div style={moduleSceneEditorStyle}>
+        <h3 style={subHeaderStyle}>Scene Editor</h3>
+        <div style={miniGridStyle}>
+          <input style={inputStyle} placeholder="Module" value={moduleSceneEditor.module} onChange={(event) => setModuleSceneEditor({ ...moduleSceneEditor, module: event.target.value })} />
+          <input style={inputStyle} placeholder="Location" value={moduleSceneEditor.location} onChange={(event) => setModuleSceneEditor({ ...moduleSceneEditor, location: event.target.value })} />
+        </div>
+        <input style={inputStyle} placeholder="Scene name" value={moduleSceneEditor.name} onChange={(event) => setModuleSceneEditor({ ...moduleSceneEditor, name: event.target.value })} />
+        <input style={inputStyle} placeholder="Tags, comma separated" value={moduleSceneEditor.tagsText} onChange={(event) => setModuleSceneEditor({ ...moduleSceneEditor, tagsText: event.target.value })} />
+        <textarea style={textAreaStyle} placeholder="Read-aloud text" value={moduleSceneEditor.readAloud} onChange={(event) => setModuleSceneEditor({ ...moduleSceneEditor, readAloud: event.target.value })} />
+        <textarea style={textAreaStyle} placeholder="DM notes, one per line" value={moduleSceneEditor.notesText} onChange={(event) => setModuleSceneEditor({ ...moduleSceneEditor, notesText: event.target.value })} />
+        <textarea style={textAreaStyle} placeholder="Monsters, one per line, e.g. 4x Ghoul" value={moduleSceneEditor.monstersText} onChange={(event) => setModuleSceneEditor({ ...moduleSceneEditor, monstersText: event.target.value })} />
+        <textarea style={textAreaStyle} placeholder="Treasure / clues" value={moduleSceneEditor.treasure} onChange={(event) => setModuleSceneEditor({ ...moduleSceneEditor, treasure: event.target.value })} />
+        <textarea style={textAreaStyle} placeholder="Exits, one per line" value={moduleSceneEditor.exitsText} onChange={(event) => setModuleSceneEditor({ ...moduleSceneEditor, exitsText: event.target.value })} />
+        <button style={buttonStyle} onClick={saveModuleScene}>💾 Save Scene</button>
+      </div>
     </Panel>
   );
 }
@@ -4028,6 +4276,7 @@ const wanderingTableListStyle = { marginTop: 12, maxHeight: 260, overflowY: "aut
 const sharedPackListStyle = { marginTop: 8, maxHeight: 260, overflowY: "auto" };
 const worldPressureMiniStyle = { marginBottom: 12, padding: 10, background: "#141b26", border: "1px solid #8a6d1d", borderRadius: 6 };
 const moduleReadAloudStyle = { padding: 12, background: "#101827", border: "1px solid #d6a03d", borderRadius: 6, marginTop: 8, color: "#f8fafc" };
+const moduleSceneEditorStyle = { marginTop: 14, paddingTop: 12, borderTop: "1px solid #374151" };
 const logBoxStyle = { maxHeight: 135, overflowY: "auto", fontSize: 13 };
 const linkButtonStyle = { display: "inline-block", textDecoration: "none", color: "#fff", background: "linear-gradient(180deg, #4b5563 0%, #252b34 100%)", border: "1px solid #6b7280", borderRadius: 6, padding: "10px 14px", fontWeight: "bold" };
 const miniGridStyle = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 6 };
