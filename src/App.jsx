@@ -818,6 +818,8 @@ export default function App() {
   const [workflowMode, setWorkflowMode] = useState(() => loadSaved("workflowMode", "Live"));
   const [cloudSyncStatus, setCloudSyncStatus] = useState(() => loadSaved("cloudSyncStatus", "Not synced yet"));
   const [hasAutoLoadedCloud, setHasAutoLoadedCloud] = useState(false);
+  const [cloudSceneCount, setCloudSceneCount] = useState(() => loadSaved("cloudSceneCount", 0));
+  const [cloudLastChecked, setCloudLastChecked] = useState(() => loadSaved("cloudLastChecked", "Never"));
   const [autoCloudSave, setAutoCloudSave] = useState(() => loadSaved("autoCloudSave", false));
   const [moduleScenes, setModuleScenes] = useState(() => loadSaved("moduleScenes", [
     {
@@ -1001,6 +1003,8 @@ export default function App() {
   useEffect(() => localStorage.setItem("channel", JSON.stringify(channel)), [channel]);
   useEffect(() => localStorage.setItem("workflowMode", JSON.stringify(workflowMode)), [workflowMode]);
   useEffect(() => localStorage.setItem("cloudSyncStatus", JSON.stringify(cloudSyncStatus)), [cloudSyncStatus]);
+  useEffect(() => localStorage.setItem("cloudSceneCount", JSON.stringify(cloudSceneCount)), [cloudSceneCount]);
+  useEffect(() => localStorage.setItem("cloudLastChecked", JSON.stringify(cloudLastChecked)), [cloudLastChecked]);
   useEffect(() => localStorage.setItem("autoCloudSave", JSON.stringify(autoCloudSave)), [autoCloudSave]);
   useEffect(() => localStorage.setItem("moduleScenes", JSON.stringify(moduleScenes)), [moduleScenes]);
   useEffect(() => localStorage.setItem("selectedSceneId", JSON.stringify(selectedSceneId)), [selectedSceneId]);
@@ -2714,9 +2718,10 @@ Earth Node Progress: ${nodeProgress}%`;
 
     try {
       const campaignState = getCampaignState();
+      const sceneCount = campaignState.moduleScenes?.length || 0;
       const payload = {
         savedAt: new Date().toISOString(),
-        sceneCount: campaignState.moduleScenes?.length || 0,
+        sceneCount,
         campaign: campaignState,
       };
 
@@ -2731,12 +2736,43 @@ Earth Node Progress: ${nodeProgress}%`;
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-      const status = `Cloud saved ${new Date().toLocaleTimeString()} — ${campaignState.moduleScenes?.length || 0} scene(s)`;
+      const status = `Cloud saved ${new Date().toLocaleTimeString()} — ${sceneCount} scene(s)`;
+      setCloudSceneCount(sceneCount);
+      setCloudLastChecked(new Date().toLocaleTimeString());
       setCloudSyncStatus(status);
       addLog(`☁️ ${status}.`);
     } catch (err) {
       setCloudSyncStatus(`Cloud save failed: ${err.message}`);
       addLog(`❌ Cloud save failed: ${err.message}`);
+    }
+  };
+
+  const checkCloudState = async () => {
+    if (!bridgeUrl || !apiKey) {
+      addLog("❌ Cloud check failed: bridge not configured.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${bridgeUrl}/campaign-state`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const payload = await res.json();
+      const data = payload.campaign || payload;
+      const sceneCount = data.moduleScenes?.length || payload.sceneCount || 0;
+      const checked = new Date().toLocaleTimeString();
+
+      setCloudSceneCount(sceneCount);
+      setCloudLastChecked(checked);
+      setCloudSyncStatus(`Cloud checked ${checked} — ${sceneCount} scene(s)`);
+      addLog(`☁️ Cloud checked: ${sceneCount} scene(s). Local: ${moduleScenes.length} scene(s).`);
+    } catch (err) {
+      setCloudSyncStatus(`Cloud check failed: ${err.message}`);
+      addLog(`❌ Cloud check failed: ${err.message}`);
     }
   };
 
@@ -2790,6 +2826,8 @@ Earth Node Progress: ${nodeProgress}%`;
       setLog(data.log || []);
 
       const loadedSceneCount = data.moduleScenes?.length || 0;
+      setCloudSceneCount(loadedSceneCount);
+      setCloudLastChecked(new Date().toLocaleTimeString());
       const status = payload.savedAt
         ? `Cloud loaded ${new Date(payload.savedAt).toLocaleString()} — ${loadedSceneCount} scene(s)`
         : `Cloud loaded ${new Date().toLocaleTimeString()} — ${loadedSceneCount} scene(s)`;
@@ -2872,8 +2910,14 @@ Earth Node Progress: ${nodeProgress}%`;
         workflowMode={workflowMode}
         setWorkflowMode={setWorkflowMode}
         cloudSyncStatus={cloudSyncStatus}
+        cloudSceneCount={cloudSceneCount}
+        cloudLastChecked={cloudLastChecked}
+        localSceneCount={moduleScenes.length}
         autoCloudSave={autoCloudSave}
         setAutoCloudSave={setAutoCloudSave}
+        saveCampaignToCloud={saveCampaignToCloud}
+        loadCampaignFromCloud={loadCampaignFromCloud}
+        checkCloudState={checkCloudState}
       />
       <WorkflowGuide workflowMode={workflowMode} />
       <WorkflowQuickActions
@@ -3159,7 +3203,7 @@ Earth Node Progress: ${nodeProgress}%`;
   );
 }
 
-function WorkflowBar({ workflowMode, setWorkflowMode, cloudSyncStatus, autoCloudSave, setAutoCloudSave }) {
+function WorkflowBar({ workflowMode, setWorkflowMode, cloudSyncStatus, cloudSceneCount, cloudLastChecked, localSceneCount, autoCloudSave, setAutoCloudSave, saveCampaignToCloud, loadCampaignFromCloud, checkCloudState }) {
   const modes = ["Prep", "Live", "Encounters", "Modules", "Combat", "After Action"];
 
   return (
@@ -3182,6 +3226,13 @@ function WorkflowBar({ workflowMode, setWorkflowMode, cloudSyncStatus, autoCloud
       <div style={workflowStatusStyle}>
         <div>Current Mode: {workflowMode}</div>
         <div>Cloud: {cloudSyncStatus}</div>
+        <div>Scenes: Local {localSceneCount || 0} / Cloud {cloudSceneCount || 0}</div>
+        <div>Checked: {cloudLastChecked}</div>
+        <div style={workflowCloudButtonRowStyle}>
+          <button style={workflowMiniButtonStyle} onClick={checkCloudState}>☁️ Check</button>
+          <button style={workflowMiniButtonStyle} onClick={saveCampaignToCloud}>Save</button>
+          <button style={workflowMiniButtonStyle} onClick={loadCampaignFromCloud}>Load</button>
+        </div>
         <button
           style={autoCloudSave ? workflowMiniButtonActiveStyle : workflowMiniButtonStyle}
           onClick={() => setAutoCloudSave(!autoCloudSave)}
@@ -4313,6 +4364,7 @@ const workflowButtonActiveStyle = { ...workflowButtonStyle, background: "linear-
 const workflowStatusStyle = { color: "#cbd5e1", fontSize: 13, display: "grid", gap: 4, justifyItems: "end" };
 const workflowMiniButtonStyle = { background: "#1f2937", color: "#e5e7eb", border: "1px solid #4b5563", borderRadius: 6, padding: "5px 8px", cursor: "pointer", fontSize: 12 };
 const workflowMiniButtonActiveStyle = { ...workflowMiniButtonStyle, background: "linear-gradient(180deg, #166534 0%, #14532d 100%)", border: "1px solid #22c55e", color: "#dcfce7" };
+const workflowCloudButtonRowStyle = { display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" };
 const workflowGuideStyle = { background: "#111827", border: "1px solid #374151", borderRadius: 8, padding: 10, marginBottom: 12 };
 const workflowGuideTitleStyle = { color: "#f2d28b", fontWeight: "bold", marginBottom: 4, textTransform: "uppercase" };
 const workflowGuideTextStyle = { color: "#d1d5db", fontSize: 14, marginBottom: 8 };
