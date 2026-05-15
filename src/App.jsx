@@ -2775,7 +2775,18 @@ Earth Node Progress: ${nodeProgress}%`;
       setDungeonAlert(data.dungeonAlert ?? 3);
       setNodeProgress(data.nodeProgress ?? 35);
       setWorldPressure(data.worldPressure || { earthCorruption: 45, moathouseStability: 2, wildernessDanger: 3 });
+      setWanderingTables(data.wanderingTables || wanderingTables);
+      setWanderingLocation(data.wanderingLocation || "Moathouse / Burial Crypt");
+      setWanderingResult(data.wanderingResult || null);
+      setModuleScenes(data.moduleScenes || moduleScenes);
+      setSelectedSceneId(data.selectedSceneId || "moathouse-burial-crypt");
+      setModuleSceneSearch(data.moduleSceneSearch || "");
+      setModuleSceneEditor(data.moduleSceneEditor || moduleSceneEditor);
+      setModuleScenePackStatus(data.moduleScenePackStatus || `Cloud loaded ${data.moduleScenes?.length || 0} module scene(s).`);
+      setCampaignFramework(data.campaignFramework || campaignFramework);
       setCalendar(data.calendar || calendar);
+      setSessionPrep(data.sessionPrep || "");
+      setSessionRecap(data.sessionRecap || "");
       setLog(data.log || []);
 
       const loadedSceneCount = data.moduleScenes?.length || 0;
