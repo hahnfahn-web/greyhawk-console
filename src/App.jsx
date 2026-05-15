@@ -858,6 +858,19 @@ export default function App() {
     exitsText: "",
   }));
   const [moduleScenePackStatus, setModuleScenePackStatus] = useState(() => loadSaved("moduleScenePackStatus", "No module scene pack imported yet"));
+  const [campaignFramework, setCampaignFramework] = useState(() => loadSaved("campaignFramework", {
+    activeCampaign: "Temple of Elemental Evil",
+    activeModule: "Moathouse",
+    activeMap: "Moathouse Dungeon",
+    campaigns: [
+      {
+        id: "t1-4",
+        name: "Temple of Elemental Evil",
+        modules: ["Hommlet", "Moathouse", "Nulb", "Temple", "Elemental Nodes"],
+        maps: ["Moathouse Upper", "Moathouse Dungeon", "Temple Level 1", "Temple Level 2", "Temple Level 3", "Temple Level 4"],
+      },
+    ],
+  }));
 
   const [calendar, setCalendar] = useState(() =>
     loadSaved("calendar", {
@@ -993,6 +1006,7 @@ export default function App() {
   useEffect(() => localStorage.setItem("moduleSceneSearch", JSON.stringify(moduleSceneSearch)), [moduleSceneSearch]);
   useEffect(() => localStorage.setItem("moduleSceneEditor", JSON.stringify(moduleSceneEditor)), [moduleSceneEditor]);
   useEffect(() => localStorage.setItem("moduleScenePackStatus", JSON.stringify(moduleScenePackStatus)), [moduleScenePackStatus]);
+  useEffect(() => localStorage.setItem("campaignFramework", JSON.stringify(campaignFramework)), [campaignFramework]);
   useEffect(() => localStorage.setItem("calendar", JSON.stringify(calendar)), [calendar]);
   useEffect(() => localStorage.setItem("earthCult", JSON.stringify(earthCult)), [earthCult]);
   useEffect(() => localStorage.setItem("dungeonAlert", JSON.stringify(dungeonAlert)), [dungeonAlert]);
@@ -1053,6 +1067,7 @@ export default function App() {
     worldPressure,
     moduleScenes,
     selectedSceneId,
+    campaignFramework,
     calendar,
     log,
   });
@@ -1306,7 +1321,13 @@ export default function App() {
     addLog(`📚 Saved new monster: ${newMonster.name}.`);
   };
 
-  const activeScene = moduleScenes.find((scene) => scene.id === selectedSceneId) || moduleScenes[0];
+  const frameworkScenes = moduleScenes.filter((scene) => {
+    const activeModule = campaignFramework.activeModule;
+    if (!activeModule) return true;
+    return scene.module === activeModule || scene.location?.toLowerCase().includes(activeModule.toLowerCase());
+  });
+
+  const activeScene = moduleScenes.find((scene) => scene.id === selectedSceneId) || frameworkScenes[0] || moduleScenes[0];
 
   const parseModuleSceneMonsters = (text) => {
     return (text || "")
@@ -2653,6 +2674,7 @@ Earth Node Progress: ${nodeProgress}%`;
       setWorldPressure(data.worldPressure || { earthCorruption: 45, moathouseStability: 2, wildernessDanger: 3 });
       setModuleScenes(data.moduleScenes || moduleScenes);
       setSelectedSceneId(data.selectedSceneId || "moathouse-burial-crypt");
+      setCampaignFramework(data.campaignFramework || campaignFramework);
       setCalendar(data.calendar || calendar);
       setLog(data.log || []);
       addLog("📂 Campaign loaded.");
@@ -2882,24 +2904,31 @@ Earth Node Progress: ${nodeProgress}%`;
           )}
 
           {workflowMode === "Modules" && (
-            <ModuleReferencePanel
-              moduleScenes={moduleScenes}
-              selectedSceneId={selectedSceneId}
-              setSelectedSceneId={setSelectedSceneId}
-              activeScene={activeScene}
-              addSceneMonstersToEncounter={addSceneMonstersToEncounter}
-              moduleSceneSearch={moduleSceneSearch}
-              setModuleSceneSearch={setModuleSceneSearch}
-              moduleSceneEditor={moduleSceneEditor}
-              setModuleSceneEditor={setModuleSceneEditor}
-              newModuleScene={newModuleScene}
-              editModuleScene={editModuleScene}
-              saveModuleScene={saveModuleScene}
-              deleteModuleScene={deleteModuleScene}
-              exportModuleScenePack={exportModuleScenePack}
-              importModuleScenePack={importModuleScenePack}
-              moduleScenePackStatus={moduleScenePackStatus}
-            />
+            <>
+              <CampaignNavigationPanel
+                campaignFramework={campaignFramework}
+                setCampaignFramework={setCampaignFramework}
+              />
+              <ModuleReferencePanel
+                campaignFramework={campaignFramework}
+                moduleScenes={moduleScenes}
+                selectedSceneId={selectedSceneId}
+                setSelectedSceneId={setSelectedSceneId}
+                activeScene={activeScene}
+                addSceneMonstersToEncounter={addSceneMonstersToEncounter}
+                moduleSceneSearch={moduleSceneSearch}
+                setModuleSceneSearch={setModuleSceneSearch}
+                moduleSceneEditor={moduleSceneEditor}
+                setModuleSceneEditor={setModuleSceneEditor}
+                newModuleScene={newModuleScene}
+                editModuleScene={editModuleScene}
+                saveModuleScene={saveModuleScene}
+                deleteModuleScene={deleteModuleScene}
+                exportModuleScenePack={exportModuleScenePack}
+                importModuleScenePack={importModuleScenePack}
+                moduleScenePackStatus={moduleScenePackStatus}
+              />
+            </>
           )}
         </div>
 
@@ -3443,7 +3472,61 @@ function CombatDirectorPanel({ party, round, active, initiative, turnIndex, next
   );
 }
 
+function CampaignNavigationPanel({ campaignFramework, setCampaignFramework }) {
+  const activeCampaign = campaignFramework.campaigns.find(
+    (campaign) => campaign.name === campaignFramework.activeCampaign
+  ) || campaignFramework.campaigns[0];
+
+  return (
+    <Panel title="Campaign Navigation">
+      <div style={innerCardStyle}>
+        <strong>Campaign</strong>
+        <select
+          style={inputStyle}
+          value={campaignFramework.activeCampaign}
+          onChange={(event) => {
+            const selected = campaignFramework.campaigns.find((campaign) => campaign.name === event.target.value);
+            setCampaignFramework((prev) => ({
+              ...prev,
+              activeCampaign: event.target.value,
+              activeModule: selected?.modules?.[0] || prev.activeModule,
+              activeMap: selected?.maps?.[0] || prev.activeMap,
+            }));
+          }}
+        >
+          {campaignFramework.campaigns.map((campaign) => (
+            <option key={campaign.id} value={campaign.name}>{campaign.name}</option>
+          ))}
+        </select>
+
+        <strong>Module</strong>
+        <select
+          style={inputStyle}
+          value={campaignFramework.activeModule}
+          onChange={(event) => setCampaignFramework((prev) => ({ ...prev, activeModule: event.target.value }))}
+        >
+          {(activeCampaign?.modules || []).map((moduleName) => (
+            <option key={moduleName} value={moduleName}>{moduleName}</option>
+          ))}
+        </select>
+
+        <strong>Map</strong>
+        <select
+          style={inputStyle}
+          value={campaignFramework.activeMap}
+          onChange={(event) => setCampaignFramework((prev) => ({ ...prev, activeMap: event.target.value }))}
+        >
+          {(activeCampaign?.maps || [campaignFramework.activeMap]).map((mapName) => (
+            <option key={mapName} value={mapName}>{mapName}</option>
+          ))}
+        </select>
+      </div>
+    </Panel>
+  );
+}
+
 function ModuleReferencePanel({
+  campaignFramework,
   moduleScenes,
   selectedSceneId,
   setSelectedSceneId,
@@ -3463,6 +3546,9 @@ function ModuleReferencePanel({
 }) {
   const query = (moduleSceneSearch || "").trim().toLowerCase();
   const filteredScenes = (moduleScenes || []).filter((scene) => {
+    const activeModule = campaignFramework?.activeModule;
+    const moduleMatch = !activeModule || scene.module === activeModule || scene.location?.toLowerCase().includes(activeModule.toLowerCase());
+    if (!moduleMatch) return false;
     if (!query) return true;
     return [scene.name, scene.module, scene.location, ...(scene.tags || [])]
       .join(" ")
