@@ -861,6 +861,7 @@ export default function App() {
     exitsText: "",
   }));
   const [moduleScenePackStatus, setModuleScenePackStatus] = useState(() => loadSaved("moduleScenePackStatus", "No module scene pack imported yet"));
+  const [dungeonSceneState, setDungeonSceneState] = useState(() => loadSaved("dungeonSceneState", {}));
   const [campaignFramework, setCampaignFramework] = useState(() => loadSaved("campaignFramework", {
     activeCampaign: "Temple of Elemental Evil",
     activeModule: "Moathouse",
@@ -1011,6 +1012,7 @@ export default function App() {
   useEffect(() => localStorage.setItem("moduleSceneSearch", JSON.stringify(moduleSceneSearch)), [moduleSceneSearch]);
   useEffect(() => localStorage.setItem("moduleSceneEditor", JSON.stringify(moduleSceneEditor)), [moduleSceneEditor]);
   useEffect(() => localStorage.setItem("moduleScenePackStatus", JSON.stringify(moduleScenePackStatus)), [moduleScenePackStatus]);
+  useEffect(() => localStorage.setItem("dungeonSceneState", JSON.stringify(dungeonSceneState)), [dungeonSceneState]);
   useEffect(() => localStorage.setItem("campaignFramework", JSON.stringify(campaignFramework)), [campaignFramework]);
   useEffect(() => localStorage.setItem("calendar", JSON.stringify(calendar)), [calendar]);
   useEffect(() => localStorage.setItem("earthCult", JSON.stringify(earthCult)), [earthCult]);
@@ -1075,6 +1077,7 @@ export default function App() {
     wanderingResult,
     moduleScenes,
     selectedSceneId,
+    dungeonSceneState,
     moduleSceneSearch,
     moduleSceneEditor,
     moduleScenePackStatus,
@@ -1503,6 +1506,29 @@ export default function App() {
     reader.readAsText(file);
   };
 
+  const updateDungeonSceneStatus = (sceneId, status) => {
+    setDungeonSceneState((prev) => ({
+      ...prev,
+      [sceneId]: {
+        ...(prev[sceneId] || {}),
+        status,
+        updatedAt: new Date().toLocaleString(),
+      },
+    }));
+    addLog(`🗺️ Scene status updated: ${status}.`);
+  };
+
+  const updateDungeonSceneNote = (sceneId, note) => {
+    setDungeonSceneState((prev) => ({
+      ...prev,
+      [sceneId]: {
+        ...(prev[sceneId] || {}),
+        note,
+        updatedAt: new Date().toLocaleString(),
+      },
+    }));
+  };
+
   const addSceneMonstersToEncounter = (scene) => {
     if (!scene?.monsters?.length) {
       addLog("ℹ️ Module scene has no monsters to add.");
@@ -1523,6 +1549,7 @@ export default function App() {
 
     setEnemies((prev) => [...prev, ...additions]);
     setActiveEncounterName(scene.name || "Module Encounter");
+    updateDungeonSceneStatus(scene.id, "Alerted");
     setWorkflowMode("Combat");
     addLog(`📚 Module scene loaded into combat: ${scene.name}.`);
   };
@@ -2687,6 +2714,7 @@ Earth Node Progress: ${nodeProgress}%`;
       setWorldPressure(data.worldPressure || { earthCorruption: 45, moathouseStability: 2, wildernessDanger: 3 });
       setModuleScenes(data.moduleScenes || moduleScenes);
       setSelectedSceneId(data.selectedSceneId || "moathouse-burial-crypt");
+      setDungeonSceneState(data.dungeonSceneState || {});
       setModuleSceneSearch(data.moduleSceneSearch || "");
       setModuleSceneEditor(data.moduleSceneEditor || moduleSceneEditor);
       setModuleScenePackStatus(data.moduleScenePackStatus || "Loaded from cloud");
@@ -2816,6 +2844,7 @@ Earth Node Progress: ${nodeProgress}%`;
       setWanderingResult(data.wanderingResult || null);
       setModuleScenes(data.moduleScenes || moduleScenes);
       setSelectedSceneId(data.selectedSceneId || "moathouse-burial-crypt");
+      setDungeonSceneState(data.dungeonSceneState || {});
       setModuleSceneSearch(data.moduleSceneSearch || "");
       setModuleSceneEditor(data.moduleSceneEditor || moduleSceneEditor);
       setModuleScenePackStatus(data.moduleScenePackStatus || `Cloud loaded ${data.moduleScenes?.length || 0} module scene(s).`);
@@ -3002,6 +3031,9 @@ Earth Node Progress: ${nodeProgress}%`;
                 exportModuleScenePack={exportModuleScenePack}
                 importModuleScenePack={importModuleScenePack}
                 moduleScenePackStatus={moduleScenePackStatus}
+                dungeonSceneState={dungeonSceneState}
+                updateDungeonSceneStatus={updateDungeonSceneStatus}
+                updateDungeonSceneNote={updateDungeonSceneNote}
               />
             </>
           )}
@@ -3625,6 +3657,9 @@ function ModuleReferencePanel({
   exportModuleScenePack,
   importModuleScenePack,
   moduleScenePackStatus,
+  dungeonSceneState,
+  updateDungeonSceneStatus,
+  updateDungeonSceneNote,
 }) {
   const query = (moduleSceneSearch || "").trim().toLowerCase();
   const filteredScenes = (moduleScenes || []).filter((scene) => {
@@ -3641,6 +3676,18 @@ function ModuleReferencePanel({
   const getSceneButtonLabel = (scene) => {
     const match = (scene.name || "").match(new RegExp("^([0-9]+[a-zA-Z]?)"));
     return match ? match[1] : (scene.name || "Scene").slice(0, 12);
+  };
+
+  const getSceneStatus = (sceneId) => dungeonSceneState?.[sceneId]?.status || "Unexplored";
+
+  const getSceneButtonStyle = (sceneId) => {
+    const status = getSceneStatus(sceneId);
+    if (sceneId === selectedSceneId) return mapRoomButtonActiveStyle;
+    if (status === "Cleared") return mapRoomButtonClearedStyle;
+    if (status === "Explored") return mapRoomButtonExploredStyle;
+    if (status === "Dangerous") return mapRoomButtonDangerStyle;
+    if (status === "Alerted") return mapRoomButtonAlertedStyle;
+    return mapRoomButtonStyle;
   };
   return (
     <Panel title="Module Reference">
@@ -3673,12 +3720,13 @@ function ModuleReferencePanel({
             filteredScenes.map((scene) => (
               <button
                 key={scene.id}
-                style={scene.id === selectedSceneId ? mapRoomButtonActiveStyle : mapRoomButtonStyle}
+                style={getSceneButtonStyle(scene.id)}
                 title={scene.name}
                 onClick={() => setSelectedSceneId(scene.id)}
               >
                 <strong>{getSceneButtonLabel(scene)}</strong>
                 <span>{scene.name}</span>
+                <small>{getSceneStatus(scene.id)}</small>
               </button>
             ))
           )}
@@ -3702,6 +3750,33 @@ function ModuleReferencePanel({
           <h3 style={subHeaderStyle}>{activeScene.name}</h3>
           <div style={{ fontSize: 12, color: "#cbd5e1", marginBottom: 8 }}>
             {activeScene.module} • {activeScene.location}
+          </div>
+
+          <div style={dungeonStatePanelStyle}>
+            <strong>Dungeon State</strong>
+            <div>Status: {getSceneStatus(activeScene.id)}</div>
+            <div style={buttonWrapStyle}>
+              {["Unexplored", "Explored", "Cleared", "Dangerous", "Alerted"].map((status) => (
+                <button
+                  key={status}
+                  style={smallButtonStyle}
+                  onClick={() => updateDungeonSceneStatus(activeScene.id, status)}
+                >
+                  {status}
+                </button>
+              ))}
+            </div>
+            <textarea
+              style={textAreaStyle}
+              placeholder="Room note, e.g. ghouls fled deeper, treasure taken, door barred"
+              value={dungeonSceneState?.[activeScene.id]?.note || ""}
+              onChange={(event) => updateDungeonSceneNote(activeScene.id, event.target.value)}
+            />
+            {dungeonSceneState?.[activeScene.id]?.updatedAt && (
+              <div style={{ fontSize: 11, color: "#94a3b8" }}>
+                Updated: {dungeonSceneState[activeScene.id].updatedAt}
+              </div>
+            )}
           </div>
 
           <div style={moduleReadAloudStyle}>
@@ -4480,6 +4555,11 @@ const activeMapLabelStyle = { fontSize: 12, color: "#cbd5e1", marginBottom: 4, w
 const mapButtonGridStyle = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(96px, 1fr))", gap: 6 };
 const mapRoomButtonStyle = { display: "grid", gap: 2, textAlign: "left", background: "#1f2937", color: "#e5e7eb", border: "1px solid #4b5563", borderRadius: 6, padding: 8, cursor: "pointer", minHeight: 56, fontSize: 12 };
 const mapRoomButtonActiveStyle = { ...mapRoomButtonStyle, background: "linear-gradient(180deg, #8a6d1d 0%, #4a3415 100%)", border: "1px solid #d6a03d", color: "#fff2b8" };
+const dungeonStatePanelStyle = { marginTop: 10, padding: 10, background: "#141b26", border: "1px solid #4b5563", borderRadius: 6 };
+const mapRoomButtonExploredStyle = { ...mapRoomButtonStyle, background: "#263244", border: "1px solid #64748b" };
+const mapRoomButtonClearedStyle = { ...mapRoomButtonStyle, background: "#16351f", border: "1px solid #22c55e" };
+const mapRoomButtonDangerStyle = { ...mapRoomButtonStyle, background: "#3f1f1f", border: "1px solid #ef4444" };
+const mapRoomButtonAlertedStyle = { ...mapRoomButtonStyle, background: "#4a3415", border: "1px solid #f59e0b" };
 const logBoxStyle = { maxHeight: 135, overflowY: "auto", fontSize: 13 };
 const linkButtonStyle = { display: "inline-block", textDecoration: "none", color: "#fff", background: "linear-gradient(180deg, #4b5563 0%, #252b34 100%)", border: "1px solid #6b7280", borderRadius: 6, padding: "10px 14px", fontWeight: "bold" };
 const miniGridStyle = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 6 };
