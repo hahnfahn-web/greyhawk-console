@@ -3555,6 +3555,11 @@ function ModuleReferencePanel({
       .toLowerCase()
       .includes(query);
   });
+
+  const getSceneButtonLabel = (scene) => {
+    const match = (scene.name || "").match(new RegExp("^([0-9]+[a-zA-Z]?)"));
+    return match ? match[1] : (scene.name || "Scene").slice(0, 12);
+  };
   return (
     <Panel title="Module Reference">
       <input
@@ -3573,6 +3578,30 @@ function ModuleReferencePanel({
         </label>
       </div>
       <div style={{ fontSize: 12, color: "#cbd5e1", marginBottom: 8 }}>Scene Pack: {moduleScenePackStatus}</div>
+
+      <div style={mapNavigationStyle}>
+        <h3 style={subHeaderStyle}>Map Navigation v1</h3>
+        <div style={{ fontSize: 12, color: "#cbd5e1", marginBottom: 8 }}>
+          Active Map: {campaignFramework?.activeMap || "Current Map"}
+        </div>
+        <div style={mapButtonGridStyle}>
+          {filteredScenes.length === 0 ? (
+            <div style={{ opacity: 0.75 }}>No scenes match this module/search.</div>
+          ) : (
+            filteredScenes.map((scene) => (
+              <button
+                key={scene.id}
+                style={scene.id === selectedSceneId ? mapRoomButtonActiveStyle : mapRoomButtonStyle}
+                title={scene.name}
+                onClick={() => setSelectedSceneId(scene.id)}
+              >
+                <strong>{getSceneButtonLabel(scene)}</strong>
+                <span>{scene.name}</span>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
 
       <select
         style={inputStyle}
@@ -4363,6 +4392,10 @@ const sharedPackListStyle = { marginTop: 8, maxHeight: 260, overflowY: "auto" };
 const worldPressureMiniStyle = { marginBottom: 12, padding: 10, background: "#141b26", border: "1px solid #8a6d1d", borderRadius: 6 };
 const moduleReadAloudStyle = { padding: 12, background: "#101827", border: "1px solid #d6a03d", borderRadius: 6, marginTop: 8, color: "#f8fafc" };
 const moduleSceneEditorStyle = { marginTop: 14, paddingTop: 12, borderTop: "1px solid #374151" };
+const mapNavigationStyle = { marginTop: 10, marginBottom: 12, padding: 10, background: "#111827", border: "1px solid #374151", borderRadius: 6 };
+const mapButtonGridStyle = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(96px, 1fr))", gap: 6 };
+const mapRoomButtonStyle = { display: "grid", gap: 2, textAlign: "left", background: "#1f2937", color: "#e5e7eb", border: "1px solid #4b5563", borderRadius: 6, padding: 8, cursor: "pointer", minHeight: 56, fontSize: 12 };
+const mapRoomButtonActiveStyle = { ...mapRoomButtonStyle, background: "linear-gradient(180deg, #8a6d1d 0%, #4a3415 100%)", border: "1px solid #d6a03d", color: "#fff2b8" };
 const logBoxStyle = { maxHeight: 135, overflowY: "auto", fontSize: 13 };
 const linkButtonStyle = { display: "inline-block", textDecoration: "none", color: "#fff", background: "linear-gradient(180deg, #4b5563 0%, #252b34 100%)", border: "1px solid #6b7280", borderRadius: 6, padding: "10px 14px", fontWeight: "bold" };
 const miniGridStyle = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 6 };
