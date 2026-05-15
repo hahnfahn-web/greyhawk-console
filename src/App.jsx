@@ -2712,9 +2712,11 @@ Earth Node Progress: ${nodeProgress}%`;
     }
 
     try {
+      const campaignState = getCampaignState();
       const payload = {
         savedAt: new Date().toISOString(),
-        campaign: getCampaignState(),
+        sceneCount: campaignState.moduleScenes?.length || 0,
+        campaign: campaignState,
       };
 
       const res = await fetch(`${bridgeUrl}/campaign-state`, {
@@ -2728,7 +2730,7 @@ Earth Node Progress: ${nodeProgress}%`;
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-      const status = `Cloud saved ${new Date().toLocaleTimeString()}`;
+      const status = `Cloud saved ${new Date().toLocaleTimeString()} — ${campaignState.moduleScenes?.length || 0} scene(s)`;
       setCloudSyncStatus(status);
       addLog(`☁️ ${status}.`);
     } catch (err) {
@@ -2775,9 +2777,10 @@ Earth Node Progress: ${nodeProgress}%`;
       setCalendar(data.calendar || calendar);
       setLog(data.log || []);
 
+      const loadedSceneCount = data.moduleScenes?.length || 0;
       const status = payload.savedAt
-        ? `Cloud loaded ${new Date(payload.savedAt).toLocaleString()}`
-        : `Cloud loaded ${new Date().toLocaleTimeString()}`;
+        ? `Cloud loaded ${new Date(payload.savedAt).toLocaleString()} — ${loadedSceneCount} scene(s)`
+        : `Cloud loaded ${new Date().toLocaleTimeString()} — ${loadedSceneCount} scene(s)`;
 
       setCloudSyncStatus(status);
       addLog(`☁️ ${status}.`);
