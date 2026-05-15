@@ -244,6 +244,20 @@ function getMonsterTurnSuggestions(monster, party = []) {
   return suggestions.slice(0, 6);
 }
 
+function getGreyhawkDayName(calendar) {
+  const days = ["Starday", "Sunday", "Moonday", "Godsday", "Waterday", "Earthday", "Freeday"];
+  if (calendar?.dayName) return calendar.dayName;
+  const sessionSeed = Number(calendar?.session || 1);
+  return days[(sessionSeed - 1) % days.length];
+}
+
+function advanceGreyhawkMoonPhase(currentPhase, step = 1) {
+  const phases = ["New", "Waxing Crescent", "First Quarter", "Waxing Gibbous", "Full", "Waning Gibbous", "Last Quarter", "Waning Crescent"];
+  const index = phases.findIndex((phase) => phase.toLowerCase() === String(currentPhase || "").toLowerCase());
+  const safeIndex = index >= 0 ? index : 1;
+  return phases[(safeIndex + step + phases.length) % phases.length];
+}
+
 const DEFAULT_MONSTER_LIBRARY = [
   {
     name: "Cultist Acolyte",
@@ -885,7 +899,7 @@ export default function App() {
       month: "Sunsebb",
       year: 576,
       dungeonTurn: 0,
-      moonPhase: "Waxing",
+      lunaPhase: "Waxing", celenePhase: "Waxing",
       session: 39,
     })
   );
@@ -2377,15 +2391,16 @@ export default function App() {
     });
   };
 
-  const buildPrep = () => `## 🕯️ Session Prep — Greyhawk Command Console
+  const buildPrep = () => `## 🕯️ Session Prep — Greyhawk Campaign Console
 
 **Focus:** ${prepFocus || "Temple of Elemental Evil"}
 **Primary Threat:** ${prepThreat || "Cult activity escalates"}
 **Likely Location:** ${prepLocation || "Near the Temple"}
 
-**Date:** ${calendar.date}, ${calendar.phase}, ${formatHour(calendar.time)}
+**Date:** ${calendar.dayName || getGreyhawkDayName(calendar)}, ${calendar.date}, ${calendar.phase}, ${formatHour(calendar.time)}
 **Dungeon Turn:** ${calendar.dungeonTurn || 0}
-**Moon Phase:** ${calendar.moonPhase || "Waxing"}
+**Luna:** ${calendar.lunaPhase || calendar.moonPhase || "Waxing"}
+**Celene:** ${calendar.celenePhase || "Waxing"}
 **Session:** #${calendar.session}
 
 ## Current World State
@@ -2461,7 +2476,7 @@ ${initiativeText}
 
 🌍 **World State**
 Date: ${calendar.date}, ${calendar.phase}, ${formatHour(calendar.time)}
-Moon: ${calendar.moonPhase || "Waxing"}
+Moon: ${calendar.lunaPhase || calendar.moonPhase || "Waxing"}
 Dungeon Turn: ${calendar.dungeonTurn || 0}
 Earth Cult Alert: ${earthCult}/5
 Dungeon Alert: ${dungeonAlert}/5
@@ -2533,7 +2548,7 @@ Earth Node Progress: ${nodeProgress}%`;
       "# 📜 Session #" + (calendar.session || 41) + " Recap — The Mouth Beneath the Marsh",
       "",
       "**In-Game Time:** " + calendar.date + ", " + calendar.phase + ", " + formatHour(calendar.time),
-      "**Moon:** " + (calendar.moonPhase || "Waxing"),
+      "**Moon:** " + (calendar.lunaPhase || calendar.moonPhase || "Waxing"),
       "**Dungeon Turn:** " + (calendar.dungeonTurn || 0),
       "",
       "## What Happened",
@@ -2934,7 +2949,7 @@ Earth Node Progress: ${nodeProgress}%`;
 
   return (
     <div style={pageStyle}>
-      <h1 style={isMobile ? mobileTitleStyle : titleStyle}>Greyhawk Command Console v4</h1>
+      <h1 style={isMobile ? mobileTitleStyle : titleStyle}>Greyhawk Campaign Console v4</h1>
       <WorkflowBar
         workflowMode={workflowMode}
         setWorkflowMode={setWorkflowMode}
@@ -3420,10 +3435,13 @@ function Panel({ title, children }) {
 function WorldClockPanel({ calendar, advanceTime }) {
   return (
     <Panel title="World Clock">
+            <div>Day: {calendar.dayName || getGreyhawkDayName(calendar)}</div>
+            <div>Luna: {calendar.lunaPhase || calendar.lunaPhase || calendar.moonPhase || "Waxing"}</div>
+            <div>Celene: {calendar.celenePhase || "Waxing"}</div>
       <div style={{ fontSize: 20, marginBottom: 6 }}>📅 {calendar.date}</div>
       <div style={{ fontSize: 18, color: "#f2d28b", marginBottom: 6 }}>☀️ {calendar.phase}</div>
       <div style={{ fontSize: 18, marginBottom: 6 }}>🕒 {formatHour(calendar.time)}</div>
-      <div style={{ marginBottom: 6 }}>🌙 Moon: {calendar.moonPhase || "Waxing"}</div>
+      <div style={{ marginBottom: 6 }}>🌙 Moon: {calendar.lunaPhase || calendar.moonPhase || "Waxing"}</div>
       <div style={{ marginBottom: 12 }}>🏰 Dungeon Turn: {calendar.dungeonTurn || 0}</div>
       <button style={smallButtonStyle} onClick={() => advanceTime(0, 10)}>+10 Min</button>
       <button style={smallButtonStyle} onClick={() => advanceTime(1, 0)}>+1 Hour</button>
