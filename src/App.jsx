@@ -1065,10 +1065,18 @@ export default function App() {
     dungeonAlert,
     nodeProgress,
     worldPressure,
+    wanderingTables,
+    wanderingLocation,
+    wanderingResult,
     moduleScenes,
     selectedSceneId,
+    moduleSceneSearch,
+    moduleSceneEditor,
+    moduleScenePackStatus,
     campaignFramework,
     calendar,
+    sessionPrep,
+    sessionRecap,
     log,
   });
 
@@ -2674,8 +2682,16 @@ Earth Node Progress: ${nodeProgress}%`;
       setWorldPressure(data.worldPressure || { earthCorruption: 45, moathouseStability: 2, wildernessDanger: 3 });
       setModuleScenes(data.moduleScenes || moduleScenes);
       setSelectedSceneId(data.selectedSceneId || "moathouse-burial-crypt");
+      setModuleSceneSearch(data.moduleSceneSearch || "");
+      setModuleSceneEditor(data.moduleSceneEditor || moduleSceneEditor);
+      setModuleScenePackStatus(data.moduleScenePackStatus || "Loaded from cloud");
       setCampaignFramework(data.campaignFramework || campaignFramework);
       setCalendar(data.calendar || calendar);
+      setSessionPrep(data.sessionPrep || "");
+      setSessionRecap(data.sessionRecap || "");
+      setWanderingTables(data.wanderingTables || wanderingTables);
+      setWanderingLocation(data.wanderingLocation || "Moathouse / Burial Crypt");
+      setWanderingResult(data.wanderingResult || null);
       setLog(data.log || []);
       addLog("📂 Campaign loaded.");
     } catch {
