@@ -3600,9 +3600,20 @@ function ModuleReferencePanel({
 
       <div style={mapNavigationStyle}>
         <h3 style={subHeaderStyle}>Map Navigation v1</h3>
-        <div style={{ fontSize: 12, color: "#cbd5e1", marginBottom: 8 }}>
-          Active Map: {campaignFramework?.activeMap || "Current Map"}
-        </div>
+<div
+  style={{
+    fontSize: 12,
+    color: "#cbd5e1",
+    marginBottom: 8,
+    wordBreak: "break-word",
+    overflowWrap: "anywhere",
+  }}
+>
+  <strong>Active Map:</strong>{" "}
+  {campaignFramework?.activeMap || "Current Map"}
+</div>     
+
+
         <div style={mapButtonGridStyle}>
           {filteredScenes.length === 0 ? (
             <div style={{ opacity: 0.75 }}>No scenes match this module/search.</div>
@@ -4411,8 +4422,20 @@ const sharedPackListStyle = { marginTop: 8, maxHeight: 260, overflowY: "auto" };
 const worldPressureMiniStyle = { marginBottom: 12, padding: 10, background: "#141b26", border: "1px solid #8a6d1d", borderRadius: 6 };
 const moduleReadAloudStyle = { padding: 12, background: "#101827", border: "1px solid #d6a03d", borderRadius: 6, marginTop: 8, color: "#f8fafc" };
 const moduleSceneEditorStyle = { marginTop: 14, paddingTop: 12, borderTop: "1px solid #374151" };
-const mapNavigationStyle = { marginTop: 10, marginBottom: 12, padding: 10, background: "#111827", border: "1px solid #374151", borderRadius: 6 };
-const mapButtonGridStyle = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(96px, 1fr))", gap: 6 };
+const mapNavigationStyle = {
+  marginTop: 10,
+  marginBottom: 12,
+  padding: 10,
+  background: "#111827",
+  border: "1px solid #374151",
+  borderRadius: 6,
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+  minWidth: 0,
+};
+
+
 const mapRoomButtonStyle = { display: "grid", gap: 2, textAlign: "left", background: "#1f2937", color: "#e5e7eb", border: "1px solid #4b5563", borderRadius: 6, padding: 8, cursor: "pointer", minHeight: 56, fontSize: 12 };
 const mapRoomButtonActiveStyle = { ...mapRoomButtonStyle, background: "linear-gradient(180deg, #8a6d1d 0%, #4a3415 100%)", border: "1px solid #d6a03d", color: "#fff2b8" };
 const logBoxStyle = { maxHeight: 135, overflowY: "auto", fontSize: 13 };
