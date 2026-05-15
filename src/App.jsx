@@ -817,6 +817,7 @@ export default function App() {
   const [customMsg, setCustomMsg] = useState("");
   const [workflowMode, setWorkflowMode] = useState(() => loadSaved("workflowMode", "Live"));
   const [cloudSyncStatus, setCloudSyncStatus] = useState(() => loadSaved("cloudSyncStatus", "Not synced yet"));
+  const [hasAutoLoadedCloud, setHasAutoLoadedCloud] = useState(false);
   const [autoCloudSave, setAutoCloudSave] = useState(() => loadSaved("autoCloudSave", false));
   const [moduleScenes, setModuleScenes] = useState(() => loadSaved("moduleScenes", [
     {
