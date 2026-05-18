@@ -875,6 +875,9 @@ export default function App() {
     exitsText: "",
   }));
   const [moduleScenePackStatus, setModuleScenePackStatus] = useState(() => loadSaved("moduleScenePackStatus", "No module scene pack imported yet"));
+  const [backendModuleSearch, setBackendModuleSearch] = useState(() => loadSaved("backendModuleSearch", ""));
+  const [backendModuleResults, setBackendModuleResults] = useState([]);
+  const [backendModuleStatus, setBackendModuleStatus] = useState(() => loadSaved("backendModuleStatus", "Backend module search not used yet"));
   const [dungeonSceneState, setDungeonSceneState] = useState(() => loadSaved("dungeonSceneState", {}));
   const [campaignFramework, setCampaignFramework] = useState(() => loadSaved("campaignFramework", {
     activeCampaign: "Temple of Elemental Evil",
@@ -1026,6 +1029,8 @@ export default function App() {
   useEffect(() => localStorage.setItem("moduleSceneSearch", JSON.stringify(moduleSceneSearch)), [moduleSceneSearch]);
   useEffect(() => localStorage.setItem("moduleSceneEditor", JSON.stringify(moduleSceneEditor)), [moduleSceneEditor]);
   useEffect(() => localStorage.setItem("moduleScenePackStatus", JSON.stringify(moduleScenePackStatus)), [moduleScenePackStatus]);
+  useEffect(() => localStorage.setItem("backendModuleSearch", JSON.stringify(backendModuleSearch)), [backendModuleSearch]);
+  useEffect(() => localStorage.setItem("backendModuleStatus", JSON.stringify(backendModuleStatus)), [backendModuleStatus]);
   useEffect(() => localStorage.setItem("dungeonSceneState", JSON.stringify(dungeonSceneState)), [dungeonSceneState]);
   useEffect(() => localStorage.setItem("campaignFramework", JSON.stringify(campaignFramework)), [campaignFramework]);
   useEffect(() => localStorage.setItem("calendar", JSON.stringify(calendar)), [calendar]);
@@ -1489,18 +1494,7 @@ export default function App() {
           const merged = [...prev];
           scenes.forEach((scene) => {
             if (!scene.name) return;
-            const clean = {
-              id: scene.id || scene.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
-              module: scene.module || "T1-4",
-              name: scene.name,
-              location: scene.location || "Unknown Location",
-              tags: Array.isArray(scene.tags) ? scene.tags : [],
-              readAloud: scene.readAloud || "No read-aloud text yet.",
-              notes: Array.isArray(scene.notes) ? scene.notes : [],
-              monsters: Array.isArray(scene.monsters) ? scene.monsters : [],
-              treasure: scene.treasure || "No treasure or clues recorded.",
-              exits: Array.isArray(scene.exits) ? scene.exits : [],
-            };
+            const clean = normalizeModuleScene(scene);
             const existingIndex = merged.findIndex((entry) => entry.id === clean.id);
             if (existingIndex >= 0) merged[existingIndex] = clean;
             else merged.push(clean);
@@ -1518,6 +1512,99 @@ export default function App() {
       }
     };
     reader.readAsText(file);
+  };
+
+  const normalizeModuleScene = (scene) => ({
+    id: scene.id || String(scene.name || `scene-${Date.now()}`).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
+    module: scene.module || campaignFramework.activeModule || "Unknown Module",
+    campaign: scene.campaign || campaignFramework.activeCampaign || "Unknown Campaign",
+    map: scene.map || campaignFramework.activeMap || "Unknown Map",
+    name: scene.name || "Unnamed Scene",
+    location: scene.location || "Unknown Location",
+    tags: Array.isArray(scene.tags) ? scene.tags : [],
+    readAloud: scene.readAloud || "No read-aloud text yet.",
+    notes: Array.isArray(scene.notes) ? scene.notes : [],
+    monsters: Array.isArray(scene.monsters) ? scene.monsters : [],
+    treasure: scene.treasure || "No treasure or clues recorded.",
+    exits: Array.isArray(scene.exits) ? scene.exits : [],
+  });
+
+  const searchBackendModuleScenes = async () => {
+    if (!bridgeUrl || !apiKey) {
+      setBackendModuleStatus("Backend search failed: bridge not configured.");
+      addLog("❌ Backend module search failed: bridge not configured.");
+      return;
+    }
+
+    const query = backendModuleSearch.trim();
+    if (!query) {
+      setBackendModuleStatus("Enter a search term first.");
+      return;
+    }
+
+    try {
+      setBackendModuleStatus("Searching backend module scenes...");
+      const res = await fetch(`${bridgeUrl}/module-scenes/search?q=${encodeURIComponent(query)}`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const payload = await res.json();
+      const results = payload.results || [];
+      setBackendModuleResults(results);
+      setBackendModuleStatus(`Found ${results.length} backend scene(s).`);
+      addLog(`🔎 Backend module search: ${query} — ${results.length} result(s).`);
+    } catch (err) {
+      setBackendModuleStatus(`Backend search failed: ${err.message}`);
+      addLog(`❌ Backend module search failed: ${err.message}`);
+    }
+  };
+
+  const importBackendModuleScene = (scene) => {
+    const clean = normalizeModuleScene(scene);
+    setModuleScenes((prev) => {
+      const existingIndex = prev.findIndex((entry) => entry.id === clean.id);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = clean;
+        return updated;
+      }
+      return [...prev, clean];
+    });
+    setSelectedSceneId(clean.id);
+    setModuleScenePackStatus(`Imported backend scene: ${clean.name}`);
+    addLog(`📚 Imported backend module scene: ${clean.name}.`);
+  };
+
+  const uploadLocalScenesToBackend = async () => {
+    if (!bridgeUrl || !apiKey) {
+      setBackendModuleStatus("Backend upload failed: bridge not configured.");
+      addLog("❌ Backend module upload failed: bridge not configured.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${bridgeUrl}/module-scenes/import`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ scenes: moduleScenes }),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const payload = await res.json();
+      const status = `Uploaded ${payload.count || moduleScenes.length} scene(s) to backend.`;
+      setBackendModuleStatus(status);
+      addLog(`☁️ ${status}`);
+    } catch (err) {
+      setBackendModuleStatus(`Backend upload failed: ${err.message}`);
+      addLog(`❌ Backend module upload failed: ${err.message}`);
+    }
   };
 
   const updateDungeonSceneStatus = (sceneId, status) => {
@@ -3046,6 +3133,13 @@ Earth Node Progress: ${nodeProgress}%`;
                 exportModuleScenePack={exportModuleScenePack}
                 importModuleScenePack={importModuleScenePack}
                 moduleScenePackStatus={moduleScenePackStatus}
+                backendModuleSearch={backendModuleSearch}
+                setBackendModuleSearch={setBackendModuleSearch}
+                backendModuleResults={backendModuleResults}
+                backendModuleStatus={backendModuleStatus}
+                searchBackendModuleScenes={searchBackendModuleScenes}
+                importBackendModuleScene={importBackendModuleScene}
+                uploadLocalScenesToBackend={uploadLocalScenesToBackend}
                 dungeonSceneState={dungeonSceneState}
                 updateDungeonSceneStatus={updateDungeonSceneStatus}
                 updateDungeonSceneNote={updateDungeonSceneNote}
@@ -3675,6 +3769,13 @@ function ModuleReferencePanel({
   exportModuleScenePack,
   importModuleScenePack,
   moduleScenePackStatus,
+  backendModuleSearch,
+  setBackendModuleSearch,
+  backendModuleResults,
+  backendModuleStatus,
+  searchBackendModuleScenes,
+  importBackendModuleScene,
+  uploadLocalScenesToBackend,
   dungeonSceneState,
   updateDungeonSceneStatus,
   updateDungeonSceneNote,
@@ -3725,6 +3826,34 @@ function ModuleReferencePanel({
         </label>
       </div>
       <div style={{ fontSize: 12, color: "#cbd5e1", marginBottom: 8 }}>Scene Pack: {moduleScenePackStatus}</div>
+
+      <div style={backendModuleSearchStyle}>
+        <h3 style={subHeaderStyle}>Backend Module Search v1</h3>
+        <div style={buttonWrapStyle}>
+          <input
+            style={{ ...inputStyle, marginBottom: 0, flex: "1 1 220px" }}
+            placeholder="Search backend scenes, e.g. burial crypt or ghoul"
+            value={backendModuleSearch}
+            onChange={(event) => setBackendModuleSearch(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") searchBackendModuleScenes();
+            }}
+          />
+          <button style={smallButtonStyle} onClick={searchBackendModuleScenes}>🔎 Search</button>
+          <button style={smallButtonStyle} onClick={uploadLocalScenesToBackend}>☁️ Upload Local Scenes</button>
+        </div>
+        <div style={{ fontSize: 12, color: "#cbd5e1", marginTop: 6 }}>{backendModuleStatus}</div>
+        <div style={backendModuleResultsStyle}>
+          {(backendModuleResults || []).map((scene) => (
+            <div key={scene.id || scene.name} style={innerCardStyle}>
+              <strong>{scene.name}</strong>
+              <div style={{ fontSize: 12, color: "#cbd5e1" }}>{scene.module || "Module"} • {scene.location || "Location"}</div>
+              <p style={{ marginTop: 6 }}>{(scene.readAloud || "").slice(0, 180)}{(scene.readAloud || "").length > 180 ? "..." : ""}</p>
+              <button style={smallButtonStyle} onClick={() => importBackendModuleScene(scene)}>📥 Import Scene</button>
+            </div>
+          ))}
+        </div>
+      </div>
 
       <div style={mapNavigationStyle}>
         <h3 style={subHeaderStyle}>Map Navigation v1</h3>
@@ -4568,6 +4697,8 @@ const sharedPackListStyle = { marginTop: 8, maxHeight: 260, overflowY: "auto" };
 const worldPressureMiniStyle = { marginBottom: 12, padding: 10, background: "#141b26", border: "1px solid #8a6d1d", borderRadius: 6 };
 const moduleReadAloudStyle = { padding: 12, background: "#101827", border: "1px solid #d6a03d", borderRadius: 6, marginTop: 8, color: "#f8fafc" };
 const moduleSceneEditorStyle = { marginTop: 14, paddingTop: 12, borderTop: "1px solid #374151" };
+const backendModuleSearchStyle = { marginTop: 10, marginBottom: 12, padding: 10, background: "#111827", border: "1px solid #374151", borderRadius: 6 };
+const backendModuleResultsStyle = { marginTop: 8, maxHeight: 260, overflowY: "auto" };
 const mapNavigationStyle = { marginTop: 10, marginBottom: 12, padding: 10, background: "#111827", border: "1px solid #374151", borderRadius: 6, display: "flex", flexDirection: "column", gap: 8, minWidth: 0 };
 const activeMapLabelStyle = { fontSize: 12, color: "#cbd5e1", marginBottom: 4, wordBreak: "break-word", overflowWrap: "anywhere", minWidth: 0 };
 const mapButtonGridStyle = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(96px, 1fr))", gap: 6 };
