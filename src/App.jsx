@@ -878,6 +878,9 @@ export default function App() {
   const [backendModuleSearch, setBackendModuleSearch] = useState(() => loadSaved("backendModuleSearch", ""));
   const [backendModuleResults, setBackendModuleResults] = useState([]);
   const [backendModuleStatus, setBackendModuleStatus] = useState(() => loadSaved("backendModuleStatus", "Backend module search not used yet"));
+  const [pdfIngestionStatus, setPdfIngestionStatus] = useState(() => loadSaved("pdfIngestionStatus", "No PDF uploaded yet"));
+  const [pdfModuleName, setPdfModuleName] = useState(() => loadSaved("pdfModuleName", "Moathouse"));
+  const [pdfCampaignName, setPdfCampaignName] = useState(() => loadSaved("pdfCampaignName", "Temple of Elemental Evil"));
   const [dungeonSceneState, setDungeonSceneState] = useState(() => loadSaved("dungeonSceneState", {}));
   const [campaignFramework, setCampaignFramework] = useState(() => loadSaved("campaignFramework", {
     activeCampaign: "Temple of Elemental Evil",
@@ -1031,6 +1034,9 @@ export default function App() {
   useEffect(() => localStorage.setItem("moduleScenePackStatus", JSON.stringify(moduleScenePackStatus)), [moduleScenePackStatus]);
   useEffect(() => localStorage.setItem("backendModuleSearch", JSON.stringify(backendModuleSearch)), [backendModuleSearch]);
   useEffect(() => localStorage.setItem("backendModuleStatus", JSON.stringify(backendModuleStatus)), [backendModuleStatus]);
+  useEffect(() => localStorage.setItem("pdfIngestionStatus", JSON.stringify(pdfIngestionStatus)), [pdfIngestionStatus]);
+  useEffect(() => localStorage.setItem("pdfModuleName", JSON.stringify(pdfModuleName)), [pdfModuleName]);
+  useEffect(() => localStorage.setItem("pdfCampaignName", JSON.stringify(pdfCampaignName)), [pdfCampaignName]);
   useEffect(() => localStorage.setItem("dungeonSceneState", JSON.stringify(dungeonSceneState)), [dungeonSceneState]);
   useEffect(() => localStorage.setItem("campaignFramework", JSON.stringify(campaignFramework)), [campaignFramework]);
   useEffect(() => localStorage.setItem("calendar", JSON.stringify(calendar)), [calendar]);
@@ -1607,27 +1613,47 @@ export default function App() {
     }
   };
 
-  const updateDungeonSceneStatus = (sceneId, status) => {
-    setDungeonSceneState((prev) => ({
-      ...prev,
-      [sceneId]: {
-        ...(prev[sceneId] || {}),
-        status,
-        updatedAt: new Date().toLocaleString(),
-      },
-    }));
-    addLog(`🗺️ Scene status updated: ${status}.`);
-  };
+  const uploadModulePdfToBackend = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
 
-  const updateDungeonSceneNote = (sceneId, note) => {
-    setDungeonSceneState((prev) => ({
-      ...prev,
-      [sceneId]: {
-        ...(prev[sceneId] || {}),
-        note,
-        updatedAt: new Date().toLocaleString(),
-      },
-    }));
+    if (!bridgeUrl || !apiKey) {
+      setPdfIngestionStatus("PDF upload failed: bridge not configured.");
+      addLog("❌ PDF upload failed: bridge not configured.");
+      event.target.value = "";
+      return;
+    }
+
+    try {
+      setPdfIngestionStatus(`Uploading ${file.name}...`);
+
+      const formData = new FormData();
+      formData.append("pdf", file);
+      formData.append("campaign", pdfCampaignName || campaignFramework.activeCampaign || "Unknown Campaign");
+      formData.append("module", pdfModuleName || campaignFramework.activeModule || "Unknown Module");
+      formData.append("map", campaignFramework.activeMap || "Unknown Map");
+
+      const res = await fetch(`${bridgeUrl}/module-pdfs/upload`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const payload = await res.json();
+      const status = `PDF ingested: ${payload.sceneCount || 0} draft scene(s) created from ${file.name}.`;
+      setPdfIngestionStatus(status);
+      setBackendModuleStatus(status);
+      addLog(`📄 ${status}`);
+      event.target.value = "";
+    } catch (err) {
+      setPdfIngestionStatus(`PDF upload failed: ${err.message}`);
+      addLog(`❌ PDF upload failed: ${err.message}`);
+      event.target.value = "";
+    }
   };
 
   const addSceneMonstersToEncounter = (scene) => {
@@ -3140,6 +3166,12 @@ Earth Node Progress: ${nodeProgress}%`;
                 searchBackendModuleScenes={searchBackendModuleScenes}
                 importBackendModuleScene={importBackendModuleScene}
                 uploadLocalScenesToBackend={uploadLocalScenesToBackend}
+                uploadModulePdfToBackend={uploadModulePdfToBackend}
+                pdfIngestionStatus={pdfIngestionStatus}
+                pdfModuleName={pdfModuleName}
+                setPdfModuleName={setPdfModuleName}
+                pdfCampaignName={pdfCampaignName}
+                setPdfCampaignName={setPdfCampaignName}
                 dungeonSceneState={dungeonSceneState}
                 updateDungeonSceneStatus={updateDungeonSceneStatus}
                 updateDungeonSceneNote={updateDungeonSceneNote}
@@ -3776,6 +3808,12 @@ function ModuleReferencePanel({
   searchBackendModuleScenes,
   importBackendModuleScene,
   uploadLocalScenesToBackend,
+  uploadModulePdfToBackend,
+  pdfIngestionStatus,
+  pdfModuleName,
+  setPdfModuleName,
+  pdfCampaignName,
+  setPdfCampaignName,
   dungeonSceneState,
   updateDungeonSceneStatus,
   updateDungeonSceneNote,
@@ -3826,6 +3864,34 @@ function ModuleReferencePanel({
         </label>
       </div>
       <div style={{ fontSize: 12, color: "#cbd5e1", marginBottom: 8 }}>Scene Pack: {moduleScenePackStatus}</div>
+
+      <div style={backendModuleSearchStyle}>
+        <h3 style={subHeaderStyle}>PDF Module Ingestion v1</h3>
+        <div style={miniGridStyle}>
+          <input
+            style={inputStyle}
+            placeholder="Campaign name"
+            value={pdfCampaignName}
+            onChange={(event) => setPdfCampaignName(event.target.value)}
+          />
+          <input
+            style={inputStyle}
+            placeholder="Module name"
+            value={pdfModuleName}
+            onChange={(event) => setPdfModuleName(event.target.value)}
+          />
+        </div>
+        <label style={buttonStyle}>
+          📄 Upload PDF to Backend
+          <input
+            type="file"
+            accept="application/pdf,.pdf"
+            onChange={uploadModulePdfToBackend}
+            style={{ display: "none" }}
+          />
+        </label>
+        <div style={{ fontSize: 12, color: "#cbd5e1", marginTop: 6 }}>{pdfIngestionStatus}</div>
+      </div>
 
       <div style={backendModuleSearchStyle}>
         <h3 style={subHeaderStyle}>Backend Module Search v1</h3>
