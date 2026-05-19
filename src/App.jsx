@@ -1194,7 +1194,7 @@ export default function App() {
     setParty((prev) =>
       prev.map((pc, idx) => {
         if (idx !== i) return pc;
-        const has = pc.conditions.includes(condition);
+        const has = (pc.conditions || []).includes(condition);
         return {
           ...pc,
           conditions: has
@@ -1654,6 +1654,29 @@ export default function App() {
       addLog(`❌ PDF upload failed: ${err.message}`);
       event.target.value = "";
     }
+  };
+
+  const updateDungeonSceneStatus = (sceneId, status) => {
+    setDungeonSceneState((prev) => ({
+      ...prev,
+      [sceneId]: {
+        ...(prev[sceneId] || {}),
+        status,
+        updatedAt: new Date().toLocaleString(),
+      },
+    }));
+    addLog(`🗺️ Scene status updated: ${status}.`);
+  };
+
+  const updateDungeonSceneNote = (sceneId, note) => {
+    setDungeonSceneState((prev) => ({
+      ...prev,
+      [sceneId]: {
+        ...(prev[sceneId] || {}),
+        note,
+        updatedAt: new Date().toLocaleString(),
+      },
+    }));
   };
 
   const addSceneMonstersToEncounter = (scene) => {
