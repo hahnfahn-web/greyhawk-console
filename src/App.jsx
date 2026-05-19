@@ -4026,6 +4026,26 @@ function ModuleReferencePanel({
             {activeScene.module} • {activeScene.location}
           </div>
 
+          <div style={structuredSceneCardStyle}>
+            <strong>Structured Scene Card v3</strong>
+            <div style={structuredSceneGridStyle}>
+              <div><strong>Room ID:</strong> {activeScene.roomId || getSceneButtonLabel(activeScene)}</div>
+              <div><strong>Type:</strong> {activeScene.encounterType || ((activeScene.monsters || []).length ? "combat" : "exploration")}</div>
+              <div><strong>Danger:</strong> {activeScene.dangerLevel || "unknown"}</div>
+              <div><strong>Quality:</strong> {activeScene.quality || ((activeScene.tags || []).includes("draft") ? "Needs Review" : "Reviewed")}</div>
+              <div><strong>Lighting:</strong> {activeScene.lighting || "Unknown"}</div>
+              <div><strong>Faction:</strong> {activeScene.faction || "Unclaimed"}</div>
+              <div><strong>Noise:</strong> {activeScene.noiseLevel || "Normal"}</div>
+              <div><strong>Patrol:</strong> {activeScene.patrolChance || "None listed"}</div>
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <strong>Connections:</strong> {(activeScene.connections || activeScene.exits || []).length ? (activeScene.connections || activeScene.exits || []).join(" • ") : "None recorded"}
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <strong>Detected Features:</strong> {(activeScene.features || []).length ? activeScene.features.join(" • ") : "No extracted features yet"}
+            </div>
+          </div>
+
           <div style={dungeonStatePanelStyle}>
             <strong>Dungeon State</strong>
             <div>Status: {getSceneStatus(activeScene.id)}</div>
@@ -4832,6 +4852,8 @@ const mapButtonGridStyle = { display: "grid", gridTemplateColumns: "repeat(auto-
 const mapRoomButtonStyle = { display: "grid", gap: 2, textAlign: "left", background: "#1f2937", color: "#e5e7eb", border: "1px solid #4b5563", borderRadius: 6, padding: 8, cursor: "pointer", minHeight: 56, fontSize: 12 };
 const mapRoomButtonActiveStyle = { ...mapRoomButtonStyle, background: "linear-gradient(180deg, #8a6d1d 0%, #4a3415 100%)", border: "1px solid #d6a03d", color: "#fff2b8" };
 const dungeonStatePanelStyle = { marginTop: 10, padding: 10, background: "#141b26", border: "1px solid #4b5563", borderRadius: 6 };
+const structuredSceneCardStyle = { marginTop: 10, padding: 10, background: "#101827", border: "1px solid #8a6d1d", borderRadius: 6 };
+const structuredSceneGridStyle = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 6, marginTop: 8, fontSize: 12 };
 const mapRoomButtonExploredStyle = { ...mapRoomButtonStyle, background: "#263244", border: "1px solid #64748b" };
 const mapRoomButtonClearedStyle = { ...mapRoomButtonStyle, background: "#16351f", border: "1px solid #22c55e" };
 const mapRoomButtonDangerStyle = { ...mapRoomButtonStyle, background: "#3f1f1f", border: "1px solid #ef4444" };
