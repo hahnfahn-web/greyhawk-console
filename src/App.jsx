@@ -3211,8 +3211,27 @@ Earth Node Progress: ${nodeProgress}%`;
                 pdfCampaignName={pdfCampaignName}
                 setPdfCampaignName={setPdfCampaignName}
                 dungeonSceneState={dungeonSceneState}
-                updateDungeonSceneStatus={updateDungeonSceneStatus}
-                updateDungeonSceneNote={updateDungeonSceneNote}
+                updateDungeonSceneStatus={(sceneId, status) => {
+                setDungeonSceneState((prev) => ({
+                  ...prev,
+                  [sceneId]: {
+                    ...(prev[sceneId] || {}),
+                    status,
+                    updatedAt: new Date().toLocaleString(),
+                  },
+                }));
+                addLog(`🗺️ Scene status updated: ${status}.`);
+              }}
+              updateDungeonSceneNote={(sceneId, note) => {
+                setDungeonSceneState((prev) => ({
+                  ...prev,
+                  [sceneId]: {
+                    ...(prev[sceneId] || {}),
+                    note,
+                    updatedAt: new Date().toLocaleString(),
+                  },
+                }));
+              }}
               />
             </>
           )}
