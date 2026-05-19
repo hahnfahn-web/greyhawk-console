@@ -879,6 +879,7 @@ export default function App() {
   const [backendModuleResults, setBackendModuleResults] = useState([]);
   const [backendModuleStatus, setBackendModuleStatus] = useState(() => loadSaved("backendModuleStatus", "Backend module search not used yet"));
   const [pdfIngestionStatus, setPdfIngestionStatus] = useState(() => loadSaved("pdfIngestionStatus", "No PDF uploaded yet"));
+  const [pdfRefinementStatus, setPdfRefinementStatus] = useState(() => loadSaved("pdfRefinementStatus", "No refinement run yet"));
   const [pdfModuleName, setPdfModuleName] = useState(() => loadSaved("pdfModuleName", "Moathouse"));
   const [pdfCampaignName, setPdfCampaignName] = useState(() => loadSaved("pdfCampaignName", "Temple of Elemental Evil"));
   const [dungeonSceneState, setDungeonSceneState] = useState(() => loadSaved("dungeonSceneState", {}));
@@ -1035,6 +1036,7 @@ export default function App() {
   useEffect(() => localStorage.setItem("backendModuleSearch", JSON.stringify(backendModuleSearch)), [backendModuleSearch]);
   useEffect(() => localStorage.setItem("backendModuleStatus", JSON.stringify(backendModuleStatus)), [backendModuleStatus]);
   useEffect(() => localStorage.setItem("pdfIngestionStatus", JSON.stringify(pdfIngestionStatus)), [pdfIngestionStatus]);
+  useEffect(() => localStorage.setItem("pdfRefinementStatus", JSON.stringify(pdfRefinementStatus)), [pdfRefinementStatus]);
   useEffect(() => localStorage.setItem("pdfModuleName", JSON.stringify(pdfModuleName)), [pdfModuleName]);
   useEffect(() => localStorage.setItem("pdfCampaignName", JSON.stringify(pdfCampaignName)), [pdfCampaignName]);
   useEffect(() => localStorage.setItem("dungeonSceneState", JSON.stringify(dungeonSceneState)), [dungeonSceneState]);
@@ -1656,27 +1658,38 @@ export default function App() {
     }
   };
 
-  const updateDungeonSceneStatus = (sceneId, status) => {
-    setDungeonSceneState((prev) => ({
-      ...prev,
-      [sceneId]: {
-        ...(prev[sceneId] || {}),
-        status,
-        updatedAt: new Date().toLocaleString(),
-      },
-    }));
-    addLog(`🗺️ Scene status updated: ${status}.`);
-  };
+  const refineBackendPdfScenes = async () => {
+    if (!bridgeUrl || !apiKey) {
+      setPdfRefinementStatus("Refinement failed: bridge not configured.");
+      addLog("❌ PDF scene refinement failed: bridge not configured.");
+      return;
+    }
 
-  const updateDungeonSceneNote = (sceneId, note) => {
-    setDungeonSceneState((prev) => ({
-      ...prev,
-      [sceneId]: {
-        ...(prev[sceneId] || {}),
-        note,
-        updatedAt: new Date().toLocaleString(),
-      },
-    }));
+    try {
+      setPdfRefinementStatus("Refining backend PDF scenes...");
+      const res = await fetch(`${bridgeUrl}/module-scenes/refine`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          campaign: pdfCampaignName || campaignFramework.activeCampaign,
+          module: pdfModuleName || campaignFramework.activeModule,
+        }),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const payload = await res.json();
+      const status = `Refined ${payload.refinedCount || 0} scene(s).`;
+      setPdfRefinementStatus(status);
+      setBackendModuleStatus(status);
+      addLog(`🧭 ${status}`);
+    } catch (err) {
+      setPdfRefinementStatus(`Refinement failed: ${err.message}`);
+      addLog(`❌ PDF scene refinement failed: ${err.message}`);
+    }
   };
 
   const addSceneMonstersToEncounter = (scene) => {
@@ -3191,6 +3204,8 @@ Earth Node Progress: ${nodeProgress}%`;
                 uploadLocalScenesToBackend={uploadLocalScenesToBackend}
                 uploadModulePdfToBackend={uploadModulePdfToBackend}
                 pdfIngestionStatus={pdfIngestionStatus}
+                pdfRefinementStatus={pdfRefinementStatus}
+                refineBackendPdfScenes={refineBackendPdfScenes}
                 pdfModuleName={pdfModuleName}
                 setPdfModuleName={setPdfModuleName}
                 pdfCampaignName={pdfCampaignName}
@@ -3833,6 +3848,8 @@ function ModuleReferencePanel({
   uploadLocalScenesToBackend,
   uploadModulePdfToBackend,
   pdfIngestionStatus,
+  pdfRefinementStatus,
+  refineBackendPdfScenes,
   pdfModuleName,
   setPdfModuleName,
   pdfCampaignName,
@@ -3913,7 +3930,9 @@ function ModuleReferencePanel({
             style={{ display: "none" }}
           />
         </label>
+        <button style={smallButtonStyle} onClick={refineBackendPdfScenes}>🧭 Refine Backend Scenes</button>
         <div style={{ fontSize: 12, color: "#cbd5e1", marginTop: 6 }}>{pdfIngestionStatus}</div>
+        <div style={{ fontSize: 12, color: "#cbd5e1", marginTop: 4 }}>{pdfRefinementStatus}</div>
       </div>
 
       <div style={backendModuleSearchStyle}>
